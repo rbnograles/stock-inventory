@@ -16,6 +16,7 @@ const dateInDays = (days: number) => {
 export const seedInventory: InventoryItem[] = [
   {
     id: "seed-rice",
+    userId: "seed-user",
     name: "Jasmine Rice",
     category: "Pantry",
     quantity: 1,
@@ -29,6 +30,7 @@ export const seedInventory: InventoryItem[] = [
   },
   {
     id: "seed-yogurt",
+    userId: "seed-user",
     name: "Greek Yogurt",
     category: "Refrigerated",
     quantity: 3,
@@ -42,6 +44,7 @@ export const seedInventory: InventoryItem[] = [
   },
   {
     id: "seed-vitamins",
+    userId: "seed-user",
     name: "Vitamin C",
     category: "Medicine",
     quantity: 24,

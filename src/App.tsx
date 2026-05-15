@@ -1,23 +1,24 @@
 /**
- * Orchestrates the HomeStock mobile dashboard. The app keeps inventory state
- * local-first, routes barcode scans into the add/edit dialog, and exposes the
- * high-frequency kitchen workflows through one focused screen.
+ * Orchestrates the authenticated HomeStock mobile dashboard. Supabase auth
+ * gates the workspace, inventory state loads from the user's remote table, and
+ * scan/add/edit/delete flows remain optimized for kitchen use.
  */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { AttentionCard } from "@/components/AttentionCard";
+import { AuthGate } from "@/components/AuthGate";
 import { BottomNav } from "@/components/BottomNav";
 import { CategorySection } from "@/components/CategorySection";
+import { EmptyInventoryState } from "@/components/EmptyInventoryState";
 import { InventoryControls, type CategoryFilter } from "@/components/InventoryControls";
 import { InventoryHeader } from "@/components/InventoryHeader";
 import { ItemFormDialog } from "@/components/ItemFormDialog";
-import { SummaryStrip } from "@/components/SummaryStrip";
 import { getExpiryStatus } from "@/lib/expiry";
+import { useAuth } from "@/hooks/useAuth";
 import { useInventory } from "@/hooks/useInventory";
-import { INVENTORY_CATEGORIES, type InventoryCategory, type InventoryItem } from "@/types/inventory";
+import { INVENTORY_CATEGORIES, type InventoryItem } from "@/types/inventory";
 
 const categoryFilters: CategoryFilter[] = ["All", ...INVENTORY_CATEGORIES];
-const ScannerDialog = lazy(() =>
-  import("@/components/ScannerDialog").then((module) => ({ default: module.ScannerDialog })),
-);
+const ScannerDialog = lazy(() => import("@/components/ScannerDialog").then((module) => ({ default: module.ScannerDialog })));
 
 const matchesSearch = (item: InventoryItem, search: string) => {
   const query = search.trim().toLowerCase();
@@ -31,12 +32,20 @@ const matchesSearch = (item: InventoryItem, search: string) => {
     .some((value) => value?.toLowerCase().includes(query));
 };
 
+const needsAttention = (item: InventoryItem) => ["expired", "soon"].includes(getExpiryStatus(item.expiryDate));
+
 export default function App() {
-  const { items, totalUnits, isLoading, error, refresh, saveDraft, removeItem } = useInventory();
+  const {
+    user, isPasswordRecovery, prefersResetPassword, isLoading: authLoading,
+    error: authError, clearError, clearPasswordRecovery, signOut,
+  } = useAuth();
+  const { items, totalUnits, isLoading, error, saveDraft, removeItem, adjustQuantity } = useInventory(user?.id);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("All");
+  const [attentionOnly, setAttentionOnly] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [passwordUpdateRequested, setPasswordUpdateRequested] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [darkMode, setDarkMode] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -49,9 +58,10 @@ export default function App() {
     () =>
       items.filter((item) => {
         const categoryMatch = category === "All" || item.category === category;
-        return categoryMatch && matchesSearch(item, search);
+        const attentionMatch = !attentionOnly || needsAttention(item);
+        return categoryMatch && attentionMatch && matchesSearch(item, search);
       }),
-    [category, items, search],
+    [attentionOnly, category, items, search],
   );
 
   const groupedItems = useMemo(
@@ -61,11 +71,6 @@ export default function App() {
         items: filteredItems.filter((item) => item.category === group),
       })),
     [filteredItems],
-  );
-
-  const consumeSoon = useMemo(
-    () => items.filter((item) => ["expired", "soon"].includes(getExpiryStatus(item.expiryDate))).length,
-    [items],
   );
 
   const openAddForm = () => {
@@ -88,47 +93,66 @@ export default function App() {
   };
 
   const handleDelete = async (item: InventoryItem) => {
-    const confirmed = window.confirm(`Delete ${item.name} from your inventory?`);
-
-    if (confirmed) {
+    if (window.confirm(`Delete ${item.name} from your inventory?`)) {
       await removeItem(item.id);
     }
   };
 
+  const handleAdjustQuantity = (item: InventoryItem, delta: number) => void adjustQuantity(item, delta);
+
+  const handlePasswordUpdateComplete = () => {
+    setPasswordUpdateRequested(false);
+    clearPasswordRecovery();
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-28 text-slate-950 dark:bg-slate-950 dark:text-white">
+    <AuthGate
+      authError={authError}
+      authLoading={authLoading}
+      isPasswordRecovery={isPasswordRecovery}
+      passwordUpdateRequested={passwordUpdateRequested}
+      prefersResetPassword={prefersResetPassword}
+      userPresent={Boolean(user)}
+      onClearError={clearError}
+      onClearPasswordRecovery={handlePasswordUpdateComplete}
+    >
+      <div className="relative min-h-[100svh] bg-vibe-light pb-32 text-slate-900 dark:bg-vibe-dark dark:text-slate-100">
       <InventoryHeader
         darkMode={darkMode}
-        onRefresh={() => void refresh()}
+        email={user?.email}
+        onChangePassword={() => setPasswordUpdateRequested(true)}
+        onSignOut={() => void signOut()}
         onToggleDarkMode={() => setDarkMode((current) => !current)}
       />
 
-      <main className="mx-auto max-w-xl space-y-5 px-4 py-5">
-        <section className="space-y-4">
-          <SummaryStrip items={items} totalUnits={totalUnits} />
-          <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 dark:border-teal-900 dark:bg-teal-950">
-            <p className="text-sm font-semibold text-teal-950 dark:text-teal-100">
-              {consumeSoon === 0
-                ? "Stock is in good shape. No urgent expiry actions today."
-                : `${consumeSoon} product${consumeSoon === 1 ? "" : "s"} should be consumed or checked soon.`}
-            </p>
-          </div>
-        </section>
+      <main className="mx-auto max-w-xl space-y-4 px-4 py-4">
+        <AttentionCard
+          items={items}
+          totalUnits={totalUnits}
+          attentionActive={attentionOnly}
+          onToggleAttention={() => setAttentionOnly((current) => !current)}
+        />
 
         <InventoryControls
           category={category}
           filters={categoryFilters}
           search={search}
-          onAdd={openAddForm}
           onCategoryChange={setCategory}
-          onScan={() => setScannerOpen(true)}
           onSearchChange={setSearch}
         />
 
-        {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
-        {isLoading ? <p className="py-8 text-center text-sm text-slate-500">Loading inventory...</p> : null}
+        {authError || error ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
+            {authError ?? error}
+          </p>
+        ) : null}
+        {isLoading ? (
+          <p className="py-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+            Loading inventory…
+          </p>
+        ) : null}
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           {groupedItems.map((group) => (
             <CategorySection
               key={group.category}
@@ -136,15 +160,21 @@ export default function App() {
               items={group.items}
               onEdit={openEditForm}
               onDelete={(item) => void handleDelete(item)}
+              onAdjustQuantity={handleAdjustQuantity}
             />
           ))}
         </div>
 
         {!isLoading && filteredItems.length === 0 ? (
-          <section className="rounded-lg border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-            <p className="font-bold text-slate-800 dark:text-slate-100">No products found</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Add an item or clear your filters.</p>
-          </section>
+          <EmptyInventoryState
+            attentionOnly={attentionOnly}
+            hasFilters={Boolean(attentionOnly || search || category !== "All")}
+            onReset={() => {
+              setAttentionOnly(false);
+              setSearch("");
+              setCategory("All");
+            }}
+          />
         ) : null}
       </main>
 
@@ -164,6 +194,7 @@ export default function App() {
         ) : null}
       </Suspense>
       <BottomNav onAdd={openAddForm} onScan={() => setScannerOpen(true)} />
-    </div>
+      </div>
+    </AuthGate>
   );
 }

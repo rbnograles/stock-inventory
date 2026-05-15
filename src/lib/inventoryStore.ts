@@ -1,46 +1,65 @@
 /**
- * Wraps IndexedDB access behind a tiny repository API. This keeps React focused
- * on state transitions while the persistence layer handles offline durability,
- * first-run seeding, and future migrations in one place.
+ * Wraps Supabase inventory persistence behind a small repository API. The UI
+ * can keep working with camelCase item objects while this module handles table
+ * mapping, authenticated ownership, and the `{ ok, message, data }`-style
+ * operational boundary expected from the project.
  */
-import { openDB, type DBSchema } from "idb";
-import { seedInventory } from "@/data/seedInventory";
+import { supabase } from "@/lib/supabaseClient";
 import type { InventoryDraft, InventoryItem } from "@/types/inventory";
 
-interface HomeStockDatabase extends DBSchema {
-  items: {
-    key: string;
-    value: InventoryItem;
-    indexes: {
-      "by-category": string;
-      "by-barcode": string;
-      "by-expiry": string;
-    };
-  };
+interface InventoryRow {
+  id: string;
+  user_id: string;
+  name: string;
+  category: InventoryItem["category"];
+  quantity: number;
+  unit: string;
+  barcode: string | null;
+  location: string | null;
+  expiry_date: string | null;
+  notes: string | null;
+  photo_data_url: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-const DATABASE_NAME = "homestock-inventory";
-const DATABASE_VERSION = 1;
-
-const getDatabase = () =>
-  openDB<HomeStockDatabase>(DATABASE_NAME, DATABASE_VERSION, {
-    upgrade(database) {
-      if (!database.objectStoreNames.contains("items")) {
-        const store = database.createObjectStore("items", { keyPath: "id" });
-        store.createIndex("by-category", "category");
-        store.createIndex("by-barcode", "barcode");
-        store.createIndex("by-expiry", "expiryDate");
-      }
-    },
-  });
-
 const cleanOptional = (value: string) => value.trim() || undefined;
+const cleanNullable = (value: string | undefined) => value?.trim() || null;
 
-export const createInventoryItem = (draft: InventoryDraft): InventoryItem => {
+const mapRowToItem = (row: InventoryRow): InventoryItem => ({
+  id: row.id,
+  userId: row.user_id,
+  name: row.name,
+  category: row.category,
+  quantity: Number(row.quantity || 0),
+  unit: row.unit,
+  barcode: row.barcode ?? undefined,
+  location: row.location ?? undefined,
+  expiryDate: row.expiry_date ?? undefined,
+  notes: row.notes ?? undefined,
+  photoDataUrl: row.photo_data_url ?? undefined,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const draftToPayload = (draft: InventoryDraft) => ({
+  name: draft.name.trim(),
+  category: draft.category,
+  quantity: Math.max(0, Number(draft.quantity) || 0),
+  unit: draft.unit.trim() || "pcs",
+  barcode: cleanNullable(draft.barcode),
+  location: cleanNullable(draft.location),
+  expiry_date: cleanNullable(draft.expiryDate),
+  notes: cleanNullable(draft.notes),
+  photo_data_url: cleanNullable(draft.photoDataUrl),
+});
+
+export const createInventoryItem = (draft: InventoryDraft, userId: string): InventoryItem => {
   const timestamp = new Date().toISOString();
 
   return {
     id: crypto.randomUUID(),
+    userId,
     name: draft.name.trim(),
     category: draft.category,
     quantity: Math.max(0, Number(draft.quantity) || 0),
@@ -73,23 +92,86 @@ export const updateInventoryItem = (
 });
 
 export const getInventoryItems = async () => {
-  const database = await getDatabase();
-  const items = await database.getAll("items");
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  if (items.length > 0) {
-    return items;
+  if (error) {
+    throw new Error(error.message);
   }
 
-  await Promise.all(seedInventory.map((item) => database.put("items", item)));
-  return seedInventory;
+  return (data as InventoryRow[]).map(mapRowToItem);
 };
 
 export const saveInventoryItem = async (item: InventoryItem) => {
-  const database = await getDatabase();
-  await database.put("items", item);
+  const payload = {
+    id: item.id,
+    user_id: item.userId,
+    name: item.name,
+    category: item.category,
+    quantity: item.quantity,
+    unit: item.unit,
+    barcode: item.barcode ?? null,
+    location: item.location ?? null,
+    expiry_date: item.expiryDate ?? null,
+    notes: item.notes ?? null,
+    photo_data_url: item.photoDataUrl ?? null,
+  };
+
+  const { error } = await supabase.from("inventory_items").upsert(payload, {
+    onConflict: "id",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const saveInventoryDraft = async (
+  draft: InventoryDraft,
+  userId: string,
+  current?: InventoryItem,
+) => {
+  if (current) {
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .update({
+        ...draftToPayload(draft),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", current.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return mapRowToItem(data as InventoryRow);
+  }
+
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .insert({
+      id: crypto.randomUUID(),
+      user_id: userId,
+      ...draftToPayload(draft),
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return mapRowToItem(data as InventoryRow);
 };
 
 export const deleteInventoryItem = async (id: string) => {
-  const database = await getDatabase();
-  await database.delete("items", id);
+  const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 };

@@ -1,7 +1,7 @@
 /**
- * Defines the shared inventory contract for the PWA. The item shape is kept
- * storage-friendly so IndexedDB can persist products offline, while still
- * carrying enough metadata for expiry decisions, barcode lookup, and photos.
+ * Defines the shared inventory contract for the PWA. The item shape mirrors
+ * the Supabase-backed inventory table while preserving UI-friendly camelCase
+ * names for expiry decisions, barcode lookup, quantity updates, and photos.
  */
 export type ExpiryStatus = "expired" | "soon" | "healthy" | "unknown";
 
@@ -16,6 +16,7 @@ export type InventoryCategory =
 
 export interface InventoryItem {
   id: string;
+  userId: string;
   name: string;
   category: InventoryCategory;
   quantity: number;

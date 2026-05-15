@@ -7,6 +7,9 @@
 import type { ComponentType } from "react";
 import {
   Button as MaterialButton,
+  Card as MaterialCard,
+  CardBody as MaterialCardBody,
+  Chip as MaterialChip,
   Dialog as MaterialDialog,
   DialogBody as MaterialDialogBody,
   DialogFooter as MaterialDialogFooter,
@@ -22,6 +25,9 @@ import {
 type MaterialComponent<Props = Record<string, unknown>> = ComponentType<Props>;
 
 export const Button = MaterialButton as unknown as MaterialComponent<Record<string, unknown>>;
+export const Card = MaterialCard as unknown as MaterialComponent<Record<string, unknown>>;
+export const CardBody = MaterialCardBody as unknown as MaterialComponent<Record<string, unknown>>;
+export const Chip = MaterialChip as unknown as MaterialComponent<Record<string, unknown>>;
 export const Dialog = MaterialDialog as unknown as MaterialComponent<Record<string, unknown>>;
 export const DialogBody = MaterialDialogBody as unknown as MaterialComponent<Record<string, unknown>>;
 export const DialogFooter = MaterialDialogFooter as unknown as MaterialComponent<Record<string, unknown>>;

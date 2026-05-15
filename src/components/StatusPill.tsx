@@ -1,44 +1,48 @@
 /**
- * Renders a compact expiry state badge shared by dashboard rows and summaries.
- * One visual mapping keeps expired, soon, healthy, and unknown products easy to
- * scan without repeating class decisions across the app.
+ * Compact expiry indicator shared by inventory rows. A small color-coded dot
+ * plus a one-word label keeps the row scannable on narrow mobile widths.
  */
-import { AlertTriangle, CheckCircle2, Clock3, HelpCircle } from "lucide-react";
 import type { ExpiryStatus } from "@/types/inventory";
 
 interface StatusPillProps {
   status: ExpiryStatus;
 }
 
-const statusConfig = {
+const statusConfig: Record<ExpiryStatus, { label: string; bg: string; text: string; dot: string }> = {
   expired: {
     label: "Expired",
-    className: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-100",
-    Icon: AlertTriangle,
+    bg: "bg-rose-100 dark:bg-rose-500/15",
+    text: "text-rose-700 dark:text-rose-200",
+    dot: "bg-rose-500",
   },
   soon: {
     label: "Soon",
-    className: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100",
-    Icon: Clock3,
+    bg: "bg-amber-100 dark:bg-amber-500/15",
+    text: "text-amber-800 dark:text-amber-200",
+    dot: "bg-amber-500",
   },
   healthy: {
-    label: "Good",
-    className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100",
-    Icon: CheckCircle2,
+    label: "Fresh",
+    bg: "bg-emerald-100 dark:bg-emerald-500/15",
+    text: "text-emerald-700 dark:text-emerald-200",
+    dot: "bg-emerald-500",
   },
   unknown: {
     label: "No date",
-    className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-    Icon: HelpCircle,
+    bg: "bg-slate-200 dark:bg-slate-700/40",
+    text: "text-slate-600 dark:text-slate-300",
+    dot: "bg-slate-400",
   },
 };
 
 export const StatusPill = ({ status }: StatusPillProps) => {
-  const { label, className, Icon } = statusConfig[status];
+  const { label, bg, text, dot } = statusConfig[status];
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${className}`}>
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${bg} ${text}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
       {label}
     </span>
   );
