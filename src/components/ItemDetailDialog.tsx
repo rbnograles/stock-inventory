@@ -1,12 +1,12 @@
 /**
  * Read-only preview sheet for a single inventory item. Opens when the user
- * taps a row, leads with the full product photo, and provides quick edit /
- * delete shortcuts so the form dialog stays out of the way until needed.
+ * taps a row, leads with the full product photo, and reuses the shared expiry
+ * tone rules so detail views match the dashboard urgency colors.
  */
 import { useEffect } from "react";
-import { Barcode, Calendar, MapPin, NotebookPen, Package, Pencil, Trash2, X } from "lucide-react";
+import { Calendar, MapPin, NotebookPen, Package, Pencil, Trash2, X } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
-import { getExpiryLabel, getExpiryStatus } from "@/lib/expiry";
+import { getExpiryLabelParts, getExpiryStatus } from "@/lib/expiry";
 import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
 import type { Category } from "@/types/category";
 import type { InventoryItem } from "@/types/inventory";
@@ -67,7 +67,7 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
   }
 
   const status = getExpiryStatus(item.expiryDate);
-  const expiryLabel = getExpiryLabel(item);
+  const expiryLabel = getExpiryLabelParts(item);
   const tone = toneForCategory(item.category);
   const categoryEmoji = emojiForCategory(item.category, categories);
 
@@ -112,7 +112,11 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
             <h2 className="text-2xl font-extrabold leading-tight hs-text-primary">{item.name}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={status} />
-              <span className="text-sm font-semibold hs-text-secondary">{expiryLabel}</span>
+              <span className="text-sm font-semibold hs-text-secondary">
+                {expiryLabel.prefix}
+                {expiryLabel.distance ? <span className={expiryLabel.tone}>{expiryLabel.distance}</span> : null}
+                {expiryLabel.suffix}
+              </span>
             </div>
           </div>
 
@@ -132,13 +136,6 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
                 icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
                 label="Location"
                 value={item.location}
-              />
-            ) : null}
-            {item.barcode ? (
-              <MetaRow
-                icon={<Barcode className="h-4 w-4" aria-hidden="true" />}
-                label="Barcode"
-                value={item.barcode}
               />
             ) : null}
           </div>

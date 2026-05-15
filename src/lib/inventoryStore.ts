@@ -1,8 +1,8 @@
 /**
  * Wraps Supabase inventory persistence behind a small repository API. The UI
  * can keep working with camelCase item objects while this module handles table
- * mapping, authenticated ownership, retryable writes, and clear save/load
- * failures for the PWA's remote inventory source of truth.
+ * mapping, authenticated ownership, retryable writes, location clearing, and
+ * clear save/load failures for the PWA's remote inventory source of truth.
  */
 import { supabase } from "@/lib/supabaseClient";
 import type { InventoryDraft, InventoryItem } from "@/types/inventory";
@@ -266,4 +266,23 @@ export const saveInventoryDraft = async (
 
 export const deleteInventoryItem = async (id: string) => {
   await withInventoryMutationRetry(() => supabase.from("inventory_items").delete().eq("id", id));
+};
+
+export const clearInventoryLocation = async (location: string, userId: string) => {
+  const cleanLocation = location.trim();
+
+  if (!cleanLocation) {
+    return;
+  }
+
+  await withInventoryMutationRetry(() =>
+    supabase
+      .from("inventory_items")
+      .update({
+        location: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("location", cleanLocation),
+  );
 };

@@ -1,15 +1,19 @@
 /**
  * Orchestrates the authenticated HomeStock mobile dashboard. Supabase auth
- * gates the workspace, inventory and finance state load from user-scoped remote
- * tables, and the bottom bar routes the primary add action to the active tool.
+ * gates the workspace, remote-backed inventory/location/finance state update
+ * through scoped mutations, and the bottom bar routes the primary add/delete
+ * actions to the active tool.
  */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { DailyDigestCard } from "@/components/DailyDigestCard";
 import { InventoryGreeting } from "@/components/InventoryGreeting";
 import { AuthGate } from "@/components/AuthGate";
 import { BottomNav, type AppView } from "@/components/BottomNav";
 import { CategoryManagerDialog } from "@/components/CategoryManagerDialog";
-import { CategorySection, type InventoryViewMode } from "@/components/CategorySection";
+import { CategorySection, type InventorySortMode, type InventoryViewMode } from "@/components/CategorySection";
+import { ALL_LOCATIONS, InventoryLocationSelect, NO_LOCATION } from "@/components/InventoryLocationSelect";
+import { InventorySortSelect } from "@/components/InventorySortSelect";
 import { ViewToggle } from "@/components/ViewToggle";
 import { EmptyInventoryState } from "@/components/EmptyInventoryState";
 import { FinanceCategoryManagerDialog } from "@/components/FinanceCategoryManagerDialog";
@@ -30,6 +34,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useFinance } from "@/hooks/useFinance";
 import { useInventory } from "@/hooks/useInventory";
+import { useInventoryLocations } from "@/hooks/useInventoryLocations";
 import { usePersistedState } from "@/hooks/usePersistedState";
 
 const APP_VIEWS: readonly AppView[] = ["inventory", "finance", "insights", "profile"];
@@ -38,6 +43,9 @@ const isAppView = (value: unknown): value is AppView =>
 const INVENTORY_VIEW_MODES: readonly InventoryViewMode[] = ["list", "cards"];
 const isInventoryViewMode = (value: unknown): value is InventoryViewMode =>
   typeof value === "string" && (INVENTORY_VIEW_MODES as readonly string[]).includes(value);
+const INVENTORY_SORT_MODES: readonly InventorySortMode[] = ["expiry", "location", "quantity"];
+const isInventorySortMode = (value: unknown): value is InventorySortMode =>
+  typeof value === "string" && (INVENTORY_SORT_MODES as readonly string[]).includes(value);
 
 const initialDarkMode = (): boolean => {
   try {
@@ -61,7 +69,7 @@ const matchesSearch = (item: InventoryItem, search: string) => {
     return true;
   }
 
-  return [item.name, item.category, item.barcode, item.location, item.notes]
+  return [item.name, item.category, item.location, item.notes]
     .filter(Boolean)
     .some((value) => value?.toLowerCase().includes(query));
 };
@@ -73,7 +81,8 @@ export default function App() {
     user, isPasswordRecovery, prefersResetPassword, isLoading: authLoading,
     error: authError, clearError, clearPasswordRecovery, signOut, updateDisplayName,
   } = useAuth();
-  const { items, totalUnits, isLoading, error, saveDraft, removeItem, adjustQuantity } = useInventory(user?.id);
+  const { items, totalUnits, isLoading, error, saveDraft, removeItem, saveQuantity, clearLocation } = useInventory(user?.id);
+  const inventoryLocations = useInventoryLocations(user?.id);
   const {
     categories,
     error: categoriesError,
@@ -92,6 +101,15 @@ export default function App() {
     "list",
     isInventoryViewMode,
   );
+  const [inventorySortMode, setInventorySortMode] = usePersistedState<InventorySortMode>(
+    "homestock-inventory-sort-mode",
+    "expiry",
+    isInventorySortMode,
+  );
+  const [locationFilter, setLocationFilter] = usePersistedState<string>(
+    "homestock-inventory-location-filter",
+    ALL_LOCATIONS,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState<InventoryItem | undefined>();
@@ -99,7 +117,9 @@ export default function App() {
   const [passwordUpdateRequested, setPasswordUpdateRequested] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
   const [pendingDelete, setPendingDelete] = useState<InventoryItem | undefined>();
+  const [pendingLocationDelete, setPendingLocationDelete] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [financeMonthOffset, setFinanceMonthOffset] = useState(0);
   const [financeKindFilter, setFinanceKindFilter] = useState<"all" | "income" | "expense">("all");
   const [financeCategoryFilter, setFinanceCategoryFilter] = useState("All");
@@ -141,14 +161,45 @@ export default function App() {
     setToast({ id: Date.now(), title, detail, tone: "error" });
   };
 
+  const locationOptions = useMemo(() => {
+    const names = new Set<string>();
+    let hasNoLocation = false;
+
+    inventoryLocations.locations.forEach((location) => names.add(location.name));
+    items.forEach((item) => {
+      const cleanLocation = item.location?.trim();
+
+      if (cleanLocation) {
+        names.add(cleanLocation);
+      } else {
+        hasNoLocation = true;
+      }
+    });
+
+    const sorted = Array.from(names).sort((a, b) => a.localeCompare(b));
+    return hasNoLocation ? [NO_LOCATION, ...sorted] : sorted;
+  }, [inventoryLocations.locations, items]);
+
+  useEffect(() => {
+    if (locationFilter !== ALL_LOCATIONS && !locationOptions.includes(locationFilter)) {
+      setLocationFilter(ALL_LOCATIONS);
+    }
+  }, [locationFilter, locationOptions, setLocationFilter]);
+
   const filteredItems = useMemo(
     () =>
       items.filter((item) => {
         const categoryMatch = category === "All" || item.category === category;
         const attentionMatch = !attentionOnly || needsAttention(item);
-        return categoryMatch && attentionMatch && matchesSearch(item, search);
+        const locationMatch =
+          inventorySortMode !== "location" ||
+          locationFilter === ALL_LOCATIONS ||
+          (locationFilter === NO_LOCATION && !item.location?.trim()) ||
+          item.location?.trim() === locationFilter;
+
+        return categoryMatch && attentionMatch && locationMatch && matchesSearch(item, search);
       }),
-    [attentionOnly, category, items, search],
+    [attentionOnly, category, inventorySortMode, items, locationFilter, search],
   );
 
   const groupedItems = useMemo(() => {
@@ -239,6 +290,29 @@ export default function App() {
     }
   };
 
+  const confirmLocationDelete = async () => {
+    if (!pendingLocationDelete) {
+      return;
+    }
+
+    setIsDeletingLocation(true);
+    try {
+      const deletedLocation = pendingLocationDelete;
+      await clearLocation(deletedLocation);
+      await inventoryLocations.removeLocation(deletedLocation);
+      setLocationFilter(ALL_LOCATIONS);
+      setPendingLocationDelete("");
+      notifySuccess("Location deleted", deletedLocation);
+    } catch (deleteError) {
+      notifyError(
+        "Location not deleted",
+        deleteError instanceof Error ? deleteError.message : "Please try deleting this location again.",
+      );
+    } finally {
+      setIsDeletingLocation(false);
+    }
+  };
+
   const openEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setInitialOperationalFundId("");
@@ -261,7 +335,17 @@ export default function App() {
     }
   };
 
-  const handleAdjustQuantity = (item: InventoryItem, delta: number) => void adjustQuantity(item, delta);
+  const handleSaveQuantity = async (item: InventoryItem, quantity: number) => {
+    try {
+      await saveQuantity(item, quantity);
+      notifySuccess("Quantity saved", item.name);
+    } catch (saveError) {
+      notifyError(
+        "Quantity not saved",
+        saveError instanceof Error ? saveError.message : "Please try saving this item again.",
+      );
+    }
+  };
 
   const handlePasswordUpdateComplete = () => {
     setPasswordUpdateRequested(false);
@@ -315,18 +399,39 @@ export default function App() {
               onManageCategories={openManageCategories}
             />
 
-            {authError || error ? (
+            {authError || error || inventoryLocations.error ? (
               <p className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
-                {authError ?? error}
+                {authError ?? error ?? inventoryLocations.error}
               </p>
             ) : null}
 
-            {filteredItems.length > 0 ? (
+            {items.length > 0 ? (
               <div className="flex items-center justify-between px-1 pt-1 mt-2">
                 <p className="text-xs font-semibold hs-text-muted">
                   {filteredItems.length} item{filteredItems.length === 1 ? "" : "s"}
                 </p>
-                <ViewToggle mode={inventoryViewMode} onChange={setInventoryViewMode} />
+                <div className="flex items-center gap-2">
+                  <InventorySortSelect mode={inventorySortMode} onChange={setInventorySortMode} />
+                  {inventorySortMode === "location" ? (
+                    <InventoryLocationSelect
+                      value={locationFilter}
+                      locations={locationOptions}
+                      onChange={setLocationFilter}
+                    />
+                  ) : null}
+                  {inventorySortMode === "location" && locationFilter !== ALL_LOCATIONS && locationFilter !== NO_LOCATION ? (
+                    <button
+                      type="button"
+                      aria-label={`Delete ${locationFilter} location`}
+                      title="Delete location"
+                      onClick={() => setPendingLocationDelete(locationFilter)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-600 shadow-sm ring-1 ring-rose-200 transition hover:bg-rose-100 active:scale-95 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/60 dark:hover:bg-rose-950/60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                  <ViewToggle mode={inventoryViewMode} onChange={setInventoryViewMode} />
+                </div>
               </div>
             ) : null}
 
@@ -339,10 +444,11 @@ export default function App() {
                   items={group.items}
                   categories={categories}
                   viewMode={inventoryViewMode}
+                  sortMode={inventorySortMode}
                   onView={openDetailView}
                   onEdit={openEditForm}
                   onDelete={handleDelete}
-                  onAdjustQuantity={handleAdjustQuantity}
+                  onSaveQuantity={handleSaveQuantity}
                 />
               ))}
             </div>
@@ -350,11 +456,17 @@ export default function App() {
             {filteredItems.length === 0 ? (
               <EmptyInventoryState
                 attentionOnly={attentionOnly}
-                hasFilters={Boolean(attentionOnly || search || category !== "All")}
+                hasFilters={Boolean(
+                  attentionOnly ||
+                  search ||
+                  category !== "All" ||
+                  (inventorySortMode === "location" && locationFilter !== ALL_LOCATIONS),
+                )}
                 onReset={() => {
                   setAttentionOnly(false);
                   setSearch("");
                   setCategory("All");
+                  setLocationFilter(ALL_LOCATIONS);
                 }}
               />
             ) : null}
@@ -438,14 +550,31 @@ export default function App() {
         onCancel={() => !isDeleting && setPendingDelete(undefined)}
         onConfirm={() => void confirmDelete()}
       />
+      <ConfirmDialog
+        open={Boolean(pendingLocationDelete)}
+        tone="danger"
+        title="Delete location?"
+        message={
+          pendingLocationDelete
+            ? `"${pendingLocationDelete}" will be removed from saved locations and cleared from all items using it.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep it"
+        busy={isDeletingLocation}
+        onCancel={() => !isDeletingLocation && setPendingLocationDelete("")}
+        onConfirm={() => void confirmLocationDelete()}
+      />
       <ItemFormDialog
         open={formOpen}
         item={editingItem}
         categories={categories}
+        locations={inventoryLocations.locations}
         onClose={() => setFormOpen(false)}
         onManageCategories={openManageCategories}
         onError={(message) => notifyError("Inventory not saved", message)}
         onSubmit={async (draft, current) => {
+          await inventoryLocations.ensureLocation(draft.location);
           const saved = await saveDraft(draft, current);
           notifySuccess(current ? "Item updated" : "Item added", saved.name);
         }}

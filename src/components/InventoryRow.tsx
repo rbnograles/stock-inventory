@@ -1,12 +1,13 @@
 /**
- * Single inventory row tuned for thumb use. The photo + text area is a tap
- * target that opens the edit dialog; quantity is bumped in place with the
- * compact stepper; the overflow menu hosts low-frequency actions like Delete.
+ * Single inventory row tuned for thumb use. The photo + text area opens the
+ * preview, while quantity edits are staged locally and saved with one tap so
+ * small stock changes do not force the whole dashboard to reload.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Minus, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { QuantitySaveControl } from "@/components/QuantitySaveControl";
 import { StatusPill } from "@/components/StatusPill";
-import { getExpiryLabel, getExpiryStatus } from "@/lib/expiry";
+import { getExpiryLabelParts, getExpiryStatus } from "@/lib/expiry";
 import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
 import type { Category } from "@/types/category";
 import type { InventoryItem } from "@/types/inventory";
@@ -17,10 +18,10 @@ interface InventoryRowProps {
   onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
-  onAdjustQuantity: (item: InventoryItem, delta: number) => void;
+  onSaveQuantity: (item: InventoryItem, quantity: number) => Promise<void>;
 }
 
-export const InventoryRow = ({ item, categories, onView, onEdit, onDelete, onAdjustQuantity }: InventoryRowProps) => {
+export const InventoryRow = ({ item, categories, onView, onEdit, onDelete, onSaveQuantity }: InventoryRowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -40,8 +41,7 @@ export const InventoryRow = ({ item, categories, onView, onEdit, onDelete, onAdj
   }, [menuOpen]);
 
   const status = getExpiryStatus(item.expiryDate);
-  const expiryLabel = getExpiryLabel(item);
-  const canDecrement = item.quantity > 0;
+  const expiryLabel = getExpiryLabelParts(item);
   const initials = useMemo(() => item.name.slice(0, 2).toUpperCase(), [item.name]);
   const tone = toneForCategory(item.category);
   const categoryEmoji = emojiForCategory(item.category, categories);
@@ -82,35 +82,16 @@ export const InventoryRow = ({ item, categories, onView, onEdit, onDelete, onAdj
           <div className="mt-0.5 flex items-center gap-1.5">
             <StatusPill status={status} />
             <span className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
-              {expiryLabel}
+              {expiryLabel.prefix}
+              {expiryLabel.distance ? <span className={`font-bold ${expiryLabel.tone}`}>{expiryLabel.distance}</span> : null}
+              {expiryLabel.suffix}
             </span>
           </div>
         </div>
       </button>
 
       <div className="flex flex-none items-center gap-1">
-        <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-700">
-          <button
-            type="button"
-            aria-label={`Decrease ${item.name} quantity`}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
-            disabled={!canDecrement}
-            onClick={() => onAdjustQuantity(item, -1)}
-          >
-            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          <span className="min-w-[1.75rem] text-center text-[13px] font-extrabold tabular-nums text-slate-900 dark:text-white">
-            {item.quantity}
-          </span>
-          <button
-            type="button"
-            aria-label={`Increase ${item.name} quantity`}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500 text-white shadow-sm transition active:scale-90 hover:bg-teal-400"
-            onClick={() => onAdjustQuantity(item, 1)}
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
+        <QuantitySaveControl item={item} onSaveQuantity={onSaveQuantity} />
 
         <div ref={menuRef} className="relative">
           <button

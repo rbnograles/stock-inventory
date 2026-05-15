@@ -1,15 +1,17 @@
 /**
  * Renders one category with either a row list or a 2-column card grid. The
  * label emoji is resolved from the user's category list with a fallback for
- * legacy items whose category was removed.
+ * legacy items. The section applies the selected dashboard sort locally, then
+ * passes quantity saves through so each item can persist independently.
  */
 import { InventoryCard } from "@/components/InventoryCard";
 import { InventoryRow } from "@/components/InventoryRow";
-import { sortByExpiryPriority } from "@/lib/expiry";
+import { getDaysUntilExpiry, sortByExpiryPriority } from "@/lib/expiry";
 import type { Category } from "@/types/category";
 import type { InventoryItem } from "@/types/inventory";
 
 export type InventoryViewMode = "list" | "cards";
+export type InventorySortMode = "expiry" | "location" | "quantity";
 
 interface CategorySectionProps {
   category: string;
@@ -17,10 +19,11 @@ interface CategorySectionProps {
   items: InventoryItem[];
   categories: Category[];
   viewMode: InventoryViewMode;
+  sortMode: InventorySortMode;
   onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
-  onAdjustQuantity: (item: InventoryItem, delta: number) => void;
+  onSaveQuantity: (item: InventoryItem, quantity: number) => Promise<void>;
 }
 
 export const CategorySection = ({
@@ -29,16 +32,17 @@ export const CategorySection = ({
   items,
   categories,
   viewMode,
+  sortMode,
   onView,
   onEdit,
   onDelete,
-  onAdjustQuantity,
+  onSaveQuantity,
 }: CategorySectionProps) => {
   if (items.length === 0) {
     return null;
   }
 
-  const sorted = sortByExpiryPriority(items);
+  const sorted = sortInventoryItems(items, sortMode);
 
   return (
     <section className="space-y-2" aria-labelledby={`${category}-heading`}>
@@ -59,7 +63,7 @@ export const CategorySection = ({
               onView={onView}
               onEdit={onEdit}
               onDelete={onDelete}
-              onAdjustQuantity={onAdjustQuantity}
+              onSaveQuantity={onSaveQuantity}
             />
           ))}
         </div>
@@ -73,11 +77,44 @@ export const CategorySection = ({
               onView={onView}
               onEdit={onEdit}
               onDelete={onDelete}
-              onAdjustQuantity={onAdjustQuantity}
+              onSaveQuantity={onSaveQuantity}
             />
           ))}
         </div>
       )}
     </section>
   );
+};
+
+const sortInventoryItems = (items: InventoryItem[], mode: InventorySortMode) => {
+  if (mode === "expiry") {
+    return sortByExpiryPriority(items);
+  }
+
+  return [...items].sort((a, b) => {
+    if (mode === "location") {
+      const aLocation = a.location?.trim();
+      const bLocation = b.location?.trim();
+
+      if (!aLocation && bLocation) {
+        return 1;
+      }
+
+      if (aLocation && !bLocation) {
+        return -1;
+      }
+
+      const locationCompare = (aLocation ?? "").localeCompare(bLocation ?? "");
+      return locationCompare || compareExpiry(a, b);
+    }
+
+    return b.quantity - a.quantity || compareExpiry(a, b);
+  });
+};
+
+const compareExpiry = (a: InventoryItem, b: InventoryItem) => {
+  const aDays = getDaysUntilExpiry(a.expiryDate) ?? Number.POSITIVE_INFINITY;
+  const bDays = getDaysUntilExpiry(b.expiryDate) ?? Number.POSITIVE_INFINITY;
+
+  return aDays - bDays || a.name.localeCompare(b.name);
 };

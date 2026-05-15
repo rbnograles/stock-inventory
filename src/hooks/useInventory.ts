@@ -1,10 +1,12 @@
 /**
  * Coordinates the authenticated Supabase inventory lifecycle for the UI. The
- * hook keeps dashboard state simple while every mutation refreshes the user's
- * server-backed stock list and preserves clear loading/error feedback.
+ * hook keeps dashboard state simple while mutations patch the affected local
+ * rows after Supabase confirms the write, avoiding full dashboard reloads for
+ * small edits like quantity changes or location cleanup.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  clearInventoryLocation,
   deleteInventoryItem,
   getInventoryItems,
   saveInventoryItem,
@@ -48,23 +50,29 @@ export const useInventory = (userId?: string) => {
       }
 
       const item = await saveInventoryDraft(draft, userId, current);
-      await refresh();
+      setItems((currentItems) => {
+        if (!current) {
+          return [item, ...currentItems];
+        }
+
+        return currentItems.map((entry) => (entry.id === item.id ? item : entry));
+      });
       return item;
     },
-    [refresh, userId],
+    [userId],
   );
 
   const removeItem = useCallback(
     async (id: string) => {
       await deleteInventoryItem(id);
-      await refresh();
+      setItems((currentItems) => currentItems.filter((item) => item.id !== id));
     },
-    [refresh],
+    [],
   );
 
-  const adjustQuantity = useCallback(
-    async (item: InventoryItem, delta: number) => {
-      const nextQuantity = Math.max(0, Number((item.quantity + delta).toFixed(2)));
+  const saveQuantity = useCallback(
+    async (item: InventoryItem, quantity: number) => {
+      const nextQuantity = Math.max(0, Number(Number(quantity).toFixed(2)));
       const draft: InventoryDraft = {
         name: item.name,
         category: item.category,
@@ -78,9 +86,27 @@ export const useInventory = (userId?: string) => {
       };
       const updated = updateInventoryItem(item, draft);
       await saveInventoryItem(updated);
-      await refresh();
+      setItems((currentItems) => currentItems.map((entry) => (entry.id === updated.id ? updated : entry)));
     },
-    [refresh],
+    [],
+  );
+
+  const clearLocation = useCallback(
+    async (location: string) => {
+      if (!userId || !location.trim()) {
+        return;
+      }
+
+      await clearInventoryLocation(location, userId);
+      setItems((currentItems) =>
+        currentItems.map((item) =>
+          item.location?.trim() === location.trim()
+            ? { ...item, location: undefined, updatedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+    },
+    [userId],
   );
 
   const totalUnits = useMemo(
@@ -96,6 +122,7 @@ export const useInventory = (userId?: string) => {
     refresh,
     saveDraft,
     removeItem,
-    adjustQuantity,
+    saveQuantity,
+    clearLocation,
   };
 };

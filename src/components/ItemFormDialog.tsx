@@ -1,20 +1,22 @@
 /**
  * Handles create and edit flows in one mobile-first sheet-style dialog. The
  * form keeps all fields local until submit, which makes edits reversible and
- * keeps barcode/photo data local until Supabase persistence succeeds. Submit
+ * offers saved user-owned locations as dropdown choices. Submit
  * failures are surfaced through the app-level toast so they stay readable on
  * compact mobile PWA screens.
  */
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Barcode, Calendar, ChevronDown, MapPin, Package, Pencil, Sparkles, Tag, X } from "lucide-react";
+import { Calendar, ChevronDown, MapPin, Package, Pencil, Sparkles, Tag, X } from "lucide-react";
 import { CameraField } from "@/components/CameraField";
 import { EMPTY_DRAFT, type InventoryDraft, type InventoryItem } from "@/types/inventory";
 import type { Category } from "@/types/category";
+import type { InventoryLocation } from "@/types/location";
 
 interface ItemFormDialogProps {
   open: boolean;
   item?: InventoryItem;
   categories: Category[];
+  locations: InventoryLocation[];
   onClose: () => void;
   onManageCategories?: () => void;
   onError?: (message: string) => void;
@@ -82,6 +84,7 @@ export const ItemFormDialog = ({
   open,
   item,
   categories,
+  locations,
   onClose,
   onManageCategories,
   onError,
@@ -90,9 +93,12 @@ export const ItemFormDialog = ({
   const defaultCategory = categories[0]?.name ?? "Other";
   const [draft, setDraft] = useState<InventoryDraft>({ ...EMPTY_DRAFT, category: defaultCategory });
   const [isSaving, setIsSaving] = useState(false);
+  const [locationIsCustom, setLocationIsCustom] = useState(false);
   const editing = Boolean(item);
   const title = editing ? "Edit item" : "Add item";
   const subtitle = editing ? "Update details, expiry, or quantity" : "Track a new household product";
+  const knownLocationNames = useMemo(() => locations.map((location) => location.name), [locations]);
+  const locationSelectValue = locationIsCustom || (locations.length === 0 && draft.location) ? "__new__" : draft.location;
 
   useEffect(() => {
     if (open) {
@@ -102,8 +108,15 @@ export const ItemFormDialog = ({
         category: initial.category || defaultCategory,
         barcode: item?.barcode ?? "",
       });
+      setLocationIsCustom(Boolean(initial.location));
     }
   }, [defaultCategory, item, open]);
+
+  useEffect(() => {
+    if (locationIsCustom && draft.location && knownLocationNames.includes(draft.location)) {
+      setLocationIsCustom(false);
+    }
+  }, [draft.location, knownLocationNames, locationIsCustom]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -247,28 +260,52 @@ export const ItemFormDialog = ({
             </div>
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Barcode" htmlFor="field-barcode">
-              <InputWithIcon
-                id="field-barcode"
-                icon={<Barcode className="h-4 w-4" />}
-                type="text"
-                placeholder="Type barcode"
-                value={draft.barcode}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraft("barcode", event.target.value)}
-              />
-            </Field>
-            <Field label="Location" htmlFor="field-location">
-              <InputWithIcon
-                id="field-location"
-                icon={<MapPin className="h-4 w-4" />}
-                type="text"
-                placeholder="e.g. Kitchen shelf"
-                value={draft.location}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraft("location", event.target.value)}
-              />
-            </Field>
-          </div>
+          <Field label="Location" htmlFor="field-location">
+            <div className="space-y-2">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+                  <MapPin className="h-4 w-4" />
+                </span>
+                <select
+                  id="field-location"
+                  value={locationSelectValue}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setLocationIsCustom(value === "__new__");
+                    updateDraft("location", value === "__new__" ? "" : value);
+                  }}
+                  className="hs-input h-12 appearance-none pl-10 pr-10"
+                >
+                  <option value="">No location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.name}>
+                      {location.name}
+                    </option>
+                  ))}
+                  <option value="__new__">Add new location</option>
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                  aria-hidden="true"
+                />
+              </div>
+
+              {locationIsCustom || locations.length === 0 ? (
+                <InputWithIcon
+                  id="field-location-new"
+                  aria-label="New location"
+                  icon={<MapPin className="h-4 w-4" />}
+                  type="text"
+                  placeholder="e.g. Kitchen shelf"
+                  value={draft.location}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                    setLocationIsCustom(true);
+                    updateDraft("location", event.target.value);
+                  }}
+                />
+              ) : null}
+            </div>
+          </Field>
 
           <Field label="Expiry date" htmlFor="field-expiry" hint="Leave blank if the product has no expiry">
             <InputWithIcon

@@ -1,12 +1,12 @@
 /**
  * Grid-view variant of the inventory row. Pairs a larger image area on top
- * with a compact metadata block and inline quantity stepper, designed to read
- * comfortably in a 2-column mobile grid while preserving every action the row
- * view offers.
+ * with compact metadata and a staged quantity save control, keeping card edits
+ * quick while avoiding a full inventory reload for each plus/minus tap.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Minus, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { getExpiryLabel, getExpiryStatus } from "@/lib/expiry";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { QuantitySaveControl } from "@/components/QuantitySaveControl";
+import { getExpiryLabelParts, getExpiryStatus } from "@/lib/expiry";
 import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
 import type { Category } from "@/types/category";
 import type { ExpiryStatus, InventoryItem } from "@/types/inventory";
@@ -17,7 +17,7 @@ interface InventoryCardProps {
   onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
-  onAdjustQuantity: (item: InventoryItem, delta: number) => void;
+  onSaveQuantity: (item: InventoryItem, quantity: number) => Promise<void>;
 }
 
 const statusBadge: Record<ExpiryStatus, { bg: string; text: string; label: string }> = {
@@ -49,7 +49,7 @@ export const InventoryCard = ({
   onView,
   onEdit,
   onDelete,
-  onAdjustQuantity,
+  onSaveQuantity,
 }: InventoryCardProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -70,8 +70,7 @@ export const InventoryCard = ({
   const categoryEmoji = emojiForCategory(item.category, categories);
   const initials = useMemo(() => item.name.slice(0, 2).toUpperCase(), [item.name]);
   const badge = statusBadge[status];
-  const canDecrement = item.quantity > 0;
-  const expiryLabel = getExpiryLabel(item);
+  const expiryLabel = getExpiryLabelParts(item);
 
   return (
     <article className={`relative ${menuOpen ? "z-20" : ""}`}>
@@ -110,33 +109,16 @@ export const InventoryCard = ({
             <h3 className="line-clamp-2 min-h-[2.2em] text-[13px] font-bold leading-tight hs-text-primary">
               {item.name}
             </h3>
-            <p className="truncate text-[11px] font-medium hs-text-muted">{expiryLabel}</p>
+            <p className="truncate text-[11px] font-medium hs-text-muted">
+              {expiryLabel.prefix}
+              {expiryLabel.distance ? <span className={`font-bold ${expiryLabel.tone}`}>{expiryLabel.distance}</span> : null}
+              {expiryLabel.suffix}
+            </p>
           </div>
         </button>
 
         <div className="flex items-center justify-between gap-1 px-3 pb-3 pt-2">
-          <div className="flex items-center gap-1 rounded-full bg-slate-100 p-0.5 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-700">
-            <button
-              type="button"
-              aria-label={`Decrease ${item.name} quantity`}
-              disabled={!canDecrement}
-              onClick={() => onAdjustQuantity(item, -1)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
-            >
-              <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            <span className="min-w-[1.5rem] text-center text-[12px] font-extrabold tabular-nums hs-text-primary">
-              {item.quantity}
-            </span>
-            <button
-              type="button"
-              aria-label={`Increase ${item.name} quantity`}
-              onClick={() => onAdjustQuantity(item, 1)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500 text-white shadow-sm transition active:scale-90 hover:bg-teal-400"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
+          <QuantitySaveControl item={item} compact onSaveQuantity={onSaveQuantity} />
 
           <div ref={menuRef} className="relative">
             <button

@@ -1,8 +1,8 @@
 /**
  * Search field plus a single horizontal strip of category filter chips and
- * inventory utilities. Chips are driven by the user's categories so adding new
- * ones in the manager shows up here automatically; category management stays
- * available after the bottom bar switches between workspaces.
+ * inventory utilities. Chips are driven by the user's categories, while search
+ * focuses on product and location text now that barcode is no longer surfaced
+ * in the visible item workflow.
  */
 import { type ChangeEvent } from "react";
 import { Search, Settings2, X } from "lucide-react";
@@ -37,7 +37,7 @@ export const InventoryControls = ({
       <input
         type="search"
         inputMode="search"
-        placeholder="Search products, barcode, location"
+        placeholder="Search products or location"
         className="hs-input h-12 pl-11 pr-11 shadow-card"
         value={search}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onSearchChange(event.target.value)}
