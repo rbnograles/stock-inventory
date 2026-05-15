@@ -35,6 +35,9 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 const APP_VIEWS: readonly AppView[] = ["inventory", "finance", "insights", "profile"];
 const isAppView = (value: unknown): value is AppView =>
   typeof value === "string" && (APP_VIEWS as readonly string[]).includes(value);
+const INVENTORY_VIEW_MODES: readonly InventoryViewMode[] = ["list", "cards"];
+const isInventoryViewMode = (value: unknown): value is InventoryViewMode =>
+  typeof value === "string" && (INVENTORY_VIEW_MODES as readonly string[]).includes(value);
 
 const initialDarkMode = (): boolean => {
   try {
@@ -84,7 +87,11 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [attentionOnly, setAttentionOnly] = useState(false);
-  const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>("list");
+  const [inventoryViewMode, setInventoryViewMode] = usePersistedState<InventoryViewMode>(
+    "homestock-inventory-view-mode",
+    "list",
+    isInventoryViewMode,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState<InventoryItem | undefined>();
