@@ -2,17 +2,13 @@
  * Defines the shared inventory contract for the PWA. The item shape mirrors
  * the Supabase-backed inventory table while preserving UI-friendly camelCase
  * names for expiry decisions, barcode lookup, quantity updates, and photos.
+ *
+ * Categories are user-defined and stored on items as plain text. The display
+ * label + emoji come from the `inventory_categories` table.
  */
 export type ExpiryStatus = "expired" | "soon" | "healthy" | "unknown";
 
-export type InventoryCategory =
-  | "Pantry"
-  | "Refrigerated"
-  | "Frozen"
-  | "Medicine"
-  | "Cleaning"
-  | "Personal Care"
-  | "Other";
+export type InventoryCategory = string;
 
 export interface InventoryItem {
   id: string;
@@ -41,16 +37,6 @@ export interface InventoryDraft {
   notes: string;
   photoDataUrl: string;
 }
-
-export const INVENTORY_CATEGORIES: InventoryCategory[] = [
-  "Pantry",
-  "Refrigerated",
-  "Frozen",
-  "Medicine",
-  "Cleaning",
-  "Personal Care",
-  "Other",
-];
 
 export const EMPTY_DRAFT: InventoryDraft = {
   name: "",

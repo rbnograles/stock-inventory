@@ -4,28 +4,21 @@
  * delete shortcuts so the form dialog stays out of the way until needed.
  */
 import { useEffect } from "react";
-import { Barcode, Calendar, MapPin, NotebookPen, Package, Pencil, Tag, Trash2, X } from "lucide-react";
+import { Barcode, Calendar, MapPin, NotebookPen, Package, Pencil, Trash2, X } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { getExpiryLabel, getExpiryStatus } from "@/lib/expiry";
-import type { InventoryCategory, InventoryItem } from "@/types/inventory";
+import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
+import type { Category } from "@/types/category";
+import type { InventoryItem } from "@/types/inventory";
 
 interface ItemDetailDialogProps {
   open: boolean;
   item?: InventoryItem;
+  categories: Category[];
   onClose: () => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
 }
-
-const heroTone: Record<InventoryCategory, string> = {
-  Pantry: "from-amber-300 via-orange-300 to-rose-300 dark:from-amber-500/30 dark:via-orange-500/20 dark:to-rose-500/20",
-  Refrigerated: "from-sky-300 via-cyan-300 to-teal-300 dark:from-sky-500/30 dark:via-cyan-500/20 dark:to-teal-500/20",
-  Frozen: "from-cyan-200 via-sky-300 to-indigo-300 dark:from-cyan-500/30 dark:via-sky-500/20 dark:to-indigo-500/20",
-  Medicine: "from-rose-300 via-pink-300 to-fuchsia-300 dark:from-rose-500/30 dark:via-pink-500/20 dark:to-fuchsia-500/20",
-  Cleaning: "from-emerald-300 via-teal-300 to-cyan-300 dark:from-emerald-500/30 dark:via-teal-500/20 dark:to-cyan-500/20",
-  "Personal Care": "from-fuchsia-300 via-purple-300 to-indigo-300 dark:from-fuchsia-500/30 dark:via-purple-500/20 dark:to-indigo-500/20",
-  Other: "from-slate-300 via-slate-400 to-slate-500 dark:from-slate-700 dark:via-slate-700 dark:to-slate-800",
-};
 
 const MetaRow = ({
   icon,
@@ -49,7 +42,7 @@ const MetaRow = ({
   </div>
 );
 
-export const ItemDetailDialog = ({ open, item, onClose, onEdit, onDelete }: ItemDetailDialogProps) => {
+export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDelete }: ItemDetailDialogProps) => {
   useEffect(() => {
     if (!open) {
       return undefined;
@@ -77,6 +70,8 @@ export const ItemDetailDialog = ({ open, item, onClose, onEdit, onDelete }: Item
 
   const status = getExpiryStatus(item.expiryDate);
   const expiryLabel = getExpiryLabel(item);
+  const tone = toneForCategory(item.category);
+  const categoryEmoji = emojiForCategory(item.category, categories);
 
   return (
     <div
@@ -92,7 +87,7 @@ export const ItemDetailDialog = ({ open, item, onClose, onEdit, onDelete }: Item
         onClick={onClose}
       />
       <div className="relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-soft animate-pop-in sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
-        <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${heroTone[item.category]}`}>
+        <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${tone.heroGradient}`}>
           {item.photoDataUrl ? (
             <img
               src={item.photoDataUrl}
@@ -118,7 +113,7 @@ export const ItemDetailDialog = ({ open, item, onClose, onEdit, onDelete }: Item
 
           <div className="absolute left-3 top-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-xs font-bold text-slate-800 shadow-sm backdrop-blur dark:bg-slate-950/70 dark:text-white">
-              <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+              <span aria-hidden="true">{categoryEmoji}</span>
               {item.category}
             </span>
           </div>

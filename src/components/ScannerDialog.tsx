@@ -1,7 +1,7 @@
 /**
  * Runs a live barcode/QR scanner through ZXing when the device allows camera
- * access. It also includes a manual fallback so Ryan can still attach barcode
- * values on browsers that block camera streams or lack the right permissions.
+ * access. It also includes a manual fallback so barcode entry still works on
+ * browsers that deny camera streams or require HTTPS for device access.
  */
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
@@ -33,8 +33,8 @@ export const ScannerDialog = ({ open, onClose, onScan }: ScannerDialogProps) => 
     if (!hasCameraSupport()) {
       setError(
         window.isSecureContext
-          ? "This browser doesn't expose camera access. Enter the barcode manually below."
-          : "Camera access requires a secure (HTTPS) connection. Enter the barcode manually below.",
+          ? "This browser does not expose camera access. Enter the barcode manually below."
+          : "Camera access requires a secure HTTPS connection. Enter the barcode manually below.",
       );
       return undefined;
     }

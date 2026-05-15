@@ -1,39 +1,33 @@
 /**
- * Search field plus a single horizontal strip of category filter chips. The
- * primary Add/Scan actions live in the persistent bottom action bar, so this
- * surface stays focused on what the user is filtering toward.
+ * Search field plus a single horizontal strip of category filter chips and
+ * inventory utilities. Chips are driven by the user's categories so adding new
+ * ones in the manager shows up here automatically; scan/category actions keep
+ * stock management available after the bottom bar switches between workspaces.
  */
 import { type ChangeEvent } from "react";
-import { Search, X } from "lucide-react";
-import type { InventoryCategory } from "@/types/inventory";
+import { ScanLine, Search, Settings2, X } from "lucide-react";
+import type { Category } from "@/types/category";
 
-export type CategoryFilter = "All" | InventoryCategory;
+export type CategoryFilter = string;
 
 interface InventoryControlsProps {
   category: CategoryFilter;
-  filters: CategoryFilter[];
+  categories: Category[];
   search: string;
   onCategoryChange: (category: CategoryFilter) => void;
   onSearchChange: (search: string) => void;
+  onManageCategories?: () => void;
+  onScan?: () => void;
 }
-
-const categoryEmoji: Record<CategoryFilter, string> = {
-  All: "✨",
-  Pantry: "🥫",
-  Refrigerated: "🥬",
-  Frozen: "🧊",
-  Medicine: "💊",
-  Cleaning: "🧼",
-  "Personal Care": "🧴",
-  Other: "📦",
-};
 
 export const InventoryControls = ({
   category,
-  filters,
+  categories,
   search,
   onCategoryChange,
   onSearchChange,
+  onManageCategories,
+  onScan,
 }: InventoryControlsProps) => (
   <section className="space-y-3" aria-label="Filter inventory">
     <label className="relative block">
@@ -67,26 +61,68 @@ export const InventoryControls = ({
       role="tablist"
       aria-label="Categories"
     >
-      {filters.map((filter) => {
-        const active = category === filter;
-        return (
-          <button
-            key={filter}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            className={`flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold transition ${
-              active
-                ? "bg-teal-500 text-white shadow-soft"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            }`}
-            onClick={() => onCategoryChange(filter)}
-          >
-            <span aria-hidden="true">{categoryEmoji[filter]}</span>
-            {filter}
-          </button>
-        );
-      })}
+      <FilterChip
+        active={category === "All"}
+        onClick={() => onCategoryChange("All")}
+        emoji="✨"
+        label="All"
+      />
+      {categories.map((entry) => (
+        <FilterChip
+          key={entry.id}
+          active={category === entry.name}
+          onClick={() => onCategoryChange(entry.name)}
+          emoji={entry.emoji}
+          label={entry.name}
+        />
+      ))}
+      {onManageCategories ? (
+        <button
+          type="button"
+          onClick={onManageCategories}
+          className="flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:border-teal-400 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-400 dark:hover:text-teal-200"
+        >
+          <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Manage
+        </button>
+      ) : null}
+      {onScan ? (
+        <button
+          type="button"
+          onClick={onScan}
+          className="flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-teal-200 bg-teal-50 px-3.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
+        >
+          <ScanLine className="h-3.5 w-3.5" aria-hidden="true" />
+          Scan
+        </button>
+      ) : null}
     </div>
   </section>
+);
+
+const FilterChip = ({
+  active,
+  emoji,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  emoji: string;
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    role="tab"
+    aria-selected={active}
+    onClick={onClick}
+    className={`flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold transition ${
+      active
+        ? "bg-teal-500 text-white shadow-soft"
+        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+    }`}
+  >
+    <span aria-hidden="true">{emoji}</span>
+    {label}
+  </button>
 );

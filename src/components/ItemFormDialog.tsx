@@ -7,14 +7,17 @@
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Barcode, Calendar, ChevronDown, MapPin, Package, Pencil, Sparkles, Tag, X } from "lucide-react";
 import { CameraField } from "@/components/CameraField";
-import { EMPTY_DRAFT, INVENTORY_CATEGORIES, type InventoryDraft, type InventoryItem } from "@/types/inventory";
+import { EMPTY_DRAFT, type InventoryDraft, type InventoryItem } from "@/types/inventory";
+import type { Category } from "@/types/category";
 
 interface ItemFormDialogProps {
   open: boolean;
   barcode: string;
   item?: InventoryItem;
+  categories: Category[];
   onClose: () => void;
   onClearBarcode: () => void;
+  onManageCategories?: () => void;
   onSubmit: (draft: InventoryDraft, item?: InventoryItem) => Promise<void>;
 }
 
@@ -84,11 +87,14 @@ export const ItemFormDialog = ({
   open,
   barcode,
   item,
+  categories,
   onClose,
   onClearBarcode,
+  onManageCategories,
   onSubmit,
 }: ItemFormDialogProps) => {
-  const [draft, setDraft] = useState<InventoryDraft>(EMPTY_DRAFT);
+  const defaultCategory = categories[0]?.name ?? "Other";
+  const [draft, setDraft] = useState<InventoryDraft>({ ...EMPTY_DRAFT, category: defaultCategory });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const editing = Boolean(item);
@@ -97,10 +103,15 @@ export const ItemFormDialog = ({
 
   useEffect(() => {
     if (open) {
-      setDraft({ ...itemToDraft(item), barcode: item?.barcode ?? barcode });
+      const initial = itemToDraft(item);
+      setDraft({
+        ...initial,
+        category: initial.category || defaultCategory,
+        barcode: item?.barcode ?? barcode,
+      });
       setError("");
     }
-  }, [barcode, item, open]);
+  }, [barcode, defaultCategory, item, open]);
 
   useEffect(() => {
     if (!open) {
@@ -233,7 +244,21 @@ export const ItemFormDialog = ({
             </Field>
           </div>
 
-          <Field label="Category" htmlFor="field-category">
+          <Field
+            label="Category"
+            htmlFor="field-category"
+            hint={
+              onManageCategories ? (
+                <button
+                  type="button"
+                  onClick={onManageCategories}
+                  className="font-bold text-teal-600 hover:underline dark:text-teal-300"
+                >
+                  Manage categories
+                </button>
+              ) : undefined
+            }
+          >
             <div className="relative">
               <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                 <Package className="h-4 w-4" />
@@ -241,14 +266,20 @@ export const ItemFormDialog = ({
               <select
                 id="field-category"
                 value={draft.category}
-                onChange={(event) => updateDraft("category", event.target.value as InventoryDraft["category"])}
+                onChange={(event) => updateDraft("category", event.target.value)}
                 className={`${fieldShell} h-12 appearance-none pl-10 pr-10`}
               >
-                {INVENTORY_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
+                {categories.length === 0 ? (
+                  <option value="">No categories yet</option>
+                ) : null}
+                {categories.map((category) => (
+                  <option key={category.id} value={category.name}>
+                    {category.emoji} {category.name}
                   </option>
                 ))}
+                {draft.category && !categories.some((category) => category.name === draft.category) ? (
+                  <option value={draft.category}>{draft.category} (legacy)</option>
+                ) : null}
               </select>
               <ChevronDown
                 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"

@@ -7,48 +7,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { getExpiryLabel, getExpiryStatus } from "@/lib/expiry";
-import type { InventoryCategory, InventoryItem } from "@/types/inventory";
+import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
+import type { Category } from "@/types/category";
+import type { InventoryItem } from "@/types/inventory";
 
 interface InventoryRowProps {
   item: InventoryItem;
+  categories: Category[];
   onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onAdjustQuantity: (item: InventoryItem, delta: number) => void;
 }
 
-const avatarTone: Record<InventoryCategory, { bg: string; text: string }> = {
-  Pantry: {
-    bg: "bg-amber-100 dark:bg-amber-500/15",
-    text: "text-amber-700 dark:text-amber-300",
-  },
-  Refrigerated: {
-    bg: "bg-sky-100 dark:bg-sky-500/15",
-    text: "text-sky-700 dark:text-sky-300",
-  },
-  Frozen: {
-    bg: "bg-cyan-100 dark:bg-cyan-500/15",
-    text: "text-cyan-700 dark:text-cyan-300",
-  },
-  Medicine: {
-    bg: "bg-rose-100 dark:bg-rose-500/15",
-    text: "text-rose-700 dark:text-rose-300",
-  },
-  Cleaning: {
-    bg: "bg-emerald-100 dark:bg-emerald-500/15",
-    text: "text-emerald-700 dark:text-emerald-300",
-  },
-  "Personal Care": {
-    bg: "bg-fuchsia-100 dark:bg-fuchsia-500/15",
-    text: "text-fuchsia-700 dark:text-fuchsia-300",
-  },
-  Other: {
-    bg: "bg-slate-200 dark:bg-slate-700",
-    text: "text-slate-700 dark:text-slate-200",
-  },
-};
-
-export const InventoryRow = ({ item, onView, onEdit, onDelete, onAdjustQuantity }: InventoryRowProps) => {
+export const InventoryRow = ({ item, categories, onView, onEdit, onDelete, onAdjustQuantity }: InventoryRowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,7 +43,8 @@ export const InventoryRow = ({ item, onView, onEdit, onDelete, onAdjustQuantity 
   const expiryLabel = getExpiryLabel(item);
   const canDecrement = item.quantity > 0;
   const initials = useMemo(() => item.name.slice(0, 2).toUpperCase(), [item.name]);
-  const tone = avatarTone[item.category];
+  const tone = toneForCategory(item.category);
+  const categoryEmoji = emojiForCategory(item.category, categories);
 
   return (
     <article className={`flex items-center gap-3 px-3 py-2.5 ${menuOpen ? "relative z-20" : ""}`}>
@@ -90,9 +63,15 @@ export const InventoryRow = ({ item, onView, onEdit, onDelete, onAdjustQuantity 
           />
         ) : (
           <div
-            className={`flex h-12 w-12 flex-none items-center justify-center rounded-xl text-sm font-extrabold ${tone.bg} ${tone.text}`}
+            className={`relative flex h-12 w-12 flex-none items-center justify-center rounded-xl text-sm font-extrabold ${tone.avatarBg} ${tone.avatarText}`}
           >
             {initials}
+            <span
+              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+              aria-hidden="true"
+            >
+              {categoryEmoji}
+            </span>
           </div>
         )}
 

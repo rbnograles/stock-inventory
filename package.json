@@ -11,7 +11,7 @@
   "dependencies": {
     "@material-tailwind/react": "^2.1.10",
     "@supabase/supabase-js": "^2.105.4",
-    "@zxing/browser": "^0.1.5",
+    "@zxing/browser": "^0.2.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
