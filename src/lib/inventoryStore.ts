@@ -104,10 +104,11 @@ export const updateInventoryItem = (
   updatedAt: new Date().toISOString(),
 });
 
-export const getInventoryItems = async () => {
+export const getInventoryItems = async (userId: string) => {
   const { data, error } = await supabase
     .from("inventory_items")
     .select("*")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {

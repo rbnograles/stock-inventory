@@ -1,5 +1,12 @@
-const CACHE_NAME = "homestock-v1";
+/**
+ * Keeps the HomeStock PWA shell available offline without caching authenticated
+ * Supabase API responses. The worker only caches same-origin app assets, which
+ * prevents production inventory reads from replaying stale data while still
+ * giving the installed app a fast, resilient startup path.
+ */
+const CACHE_NAME = "homestock-v2";
 const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest"];
+const STATIC_PATHS = ["/assets/", "/icons/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,7 +32,41 @@ const isCacheable = (request, response) => {
   }
 
   const url = new URL(request.url);
-  return url.protocol === "http:" || url.protocol === "https:";
+  return url.origin === self.location.origin;
+};
+
+const isStaticAsset = (url) =>
+  STATIC_PATHS.some((path) => url.pathname.startsWith(path)) ||
+  url.pathname === "/manifest.webmanifest";
+
+const networkFirstNavigation = async (request) => {
+  try {
+    const response = await fetch(request);
+    if (isCacheable(request, response)) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put("/index.html", response.clone());
+    }
+    return response;
+  } catch {
+    return caches.match("/index.html");
+  }
+};
+
+const cacheFirstAsset = async (request) => {
+  const cached = await caches.match(request);
+
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(request);
+
+  if (isCacheable(request, response)) {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+
+  return response;
 };
 
 self.addEventListener("fetch", (event) => {
@@ -33,24 +74,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
+  const url = new URL(event.request.url);
 
-      return fetch(event.request)
-        .then((response) => {
-          if (isCacheable(event.request, response)) {
-            const copy = response.clone();
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(event.request, copy))
-              .catch(() => {});
-          }
-          return response;
-        })
-        .catch(() => caches.match("/index.html"));
-    }),
-  );
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(networkFirstNavigation(event.request));
+    return;
+  }
+
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirstAsset(event.request));
+  }
 });
