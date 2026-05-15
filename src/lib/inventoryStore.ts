@@ -26,6 +26,19 @@ interface InventoryRow {
 const cleanOptional = (value: string) => value.trim() || undefined;
 const cleanNullable = (value: string | undefined) => value?.trim() || null;
 
+const generateId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 const mapRowToItem = (row: InventoryRow): InventoryItem => ({
   id: row.id,
   userId: row.user_id,
@@ -58,7 +71,7 @@ export const createInventoryItem = (draft: InventoryDraft, userId: string): Inve
   const timestamp = new Date().toISOString();
 
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     userId,
     name: draft.name.trim(),
     category: draft.category,
@@ -154,7 +167,7 @@ export const saveInventoryDraft = async (
   const { data, error } = await supabase
     .from("inventory_items")
     .insert({
-      id: crypto.randomUUID(),
+      id: generateId(),
       user_id: userId,
       ...draftToPayload(draft),
     })

@@ -57,14 +57,14 @@ export const CameraField = ({ value, onChange }: CameraFieldProps) => {
       >
         {value ? (
           <>
-            <img className="h-40 w-full object-cover" src={value} alt="Selected inventory item" />
+            <img className="h-56 w-full object-cover" src={value} alt="Selected inventory item" />
             <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur dark:bg-slate-900/80 dark:text-slate-100">
               <Camera className="h-3.5 w-3.5" aria-hidden="true" />
               Replace photo
             </span>
           </>
         ) : (
-          <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
+          <div className="flex h-56 flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 group-hover:bg-teal-500 group-hover:text-white group-hover:ring-teal-400 dark:bg-slate-900 dark:ring-slate-700 dark:group-hover:bg-teal-500 dark:group-hover:ring-teal-400">
               <ImagePlus className="h-6 w-6" aria-hidden="true" />
             </span>

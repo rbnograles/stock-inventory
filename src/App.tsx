@@ -11,6 +11,8 @@ import { CategorySection } from "@/components/CategorySection";
 import { EmptyInventoryState } from "@/components/EmptyInventoryState";
 import { InventoryControls, type CategoryFilter } from "@/components/InventoryControls";
 import { InventoryHeader } from "@/components/InventoryHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ItemDetailDialog } from "@/components/ItemDetailDialog";
 import { ItemFormDialog } from "@/components/ItemFormDialog";
 import { getExpiryStatus } from "@/lib/expiry";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,9 +46,13 @@ export default function App() {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState<InventoryItem | undefined>();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [passwordUpdateRequested, setPasswordUpdateRequested] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<InventoryItem | undefined>();
+  const [isDeleting, setIsDeleting] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [darkMode, setDarkMode] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
 
@@ -82,7 +88,13 @@ export default function App() {
   const openEditForm = (item: InventoryItem) => {
     setEditingItem(item);
     setScannedBarcode("");
+    setDetailOpen(false);
     setFormOpen(true);
+  };
+
+  const openDetailView = (item: InventoryItem) => {
+    setViewingItem(item);
+    setDetailOpen(true);
   };
 
   const handleScan = (barcode: string) => {
@@ -92,9 +104,22 @@ export default function App() {
     setFormOpen(true);
   };
 
-  const handleDelete = async (item: InventoryItem) => {
-    if (window.confirm(`Delete ${item.name} from your inventory?`)) {
-      await removeItem(item.id);
+  const handleDelete = (item: InventoryItem) => {
+    setPendingDelete(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await removeItem(pendingDelete.id);
+      setDetailOpen(false);
+      setPendingDelete(undefined);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -158,8 +183,9 @@ export default function App() {
               key={group.category}
               category={group.category}
               items={group.items}
+              onView={openDetailView}
               onEdit={openEditForm}
-              onDelete={(item) => void handleDelete(item)}
+              onDelete={handleDelete}
               onAdjustQuantity={handleAdjustQuantity}
             />
           ))}
@@ -178,6 +204,28 @@ export default function App() {
         ) : null}
       </main>
 
+      <ItemDetailDialog
+        open={detailOpen}
+        item={viewingItem}
+        onClose={() => setDetailOpen(false)}
+        onEdit={openEditForm}
+        onDelete={handleDelete}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        tone="danger"
+        title="Delete item?"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.name}" will be removed from your inventory. This can't be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep it"
+        busy={isDeleting}
+        onCancel={() => !isDeleting && setPendingDelete(undefined)}
+        onConfirm={() => void confirmDelete()}
+      />
       <ItemFormDialog
         open={formOpen}
         barcode={scannedBarcode}

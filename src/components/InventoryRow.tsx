@@ -11,6 +11,7 @@ import type { InventoryCategory, InventoryItem } from "@/types/inventory";
 
 interface InventoryRowProps {
   item: InventoryItem;
+  onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onAdjustQuantity: (item: InventoryItem, delta: number) => void;
@@ -47,7 +48,7 @@ const avatarTone: Record<InventoryCategory, { bg: string; text: string }> = {
   },
 };
 
-export const InventoryRow = ({ item, onEdit, onDelete, onAdjustQuantity }: InventoryRowProps) => {
+export const InventoryRow = ({ item, onView, onEdit, onDelete, onAdjustQuantity }: InventoryRowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,11 +74,11 @@ export const InventoryRow = ({ item, onEdit, onDelete, onAdjustQuantity }: Inven
   const tone = avatarTone[item.category];
 
   return (
-    <article className="flex items-center gap-3 px-3 py-2.5">
+    <article className={`flex items-center gap-3 px-3 py-2.5 ${menuOpen ? "relative z-20" : ""}`}>
       <button
         type="button"
-        aria-label={`Edit ${item.name}`}
-        onClick={() => onEdit(item)}
+        aria-label={`Open ${item.name} details`}
+        onClick={() => onView(item)}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left transition active:scale-[0.99]"
       >
         {item.photoDataUrl ? (
@@ -109,17 +110,17 @@ export const InventoryRow = ({ item, onEdit, onDelete, onAdjustQuantity }: Inven
       </button>
 
       <div className="flex flex-none items-center gap-1">
-        <div className="flex items-center gap-0.5 rounded-full bg-slate-100 p-0.5 dark:bg-slate-800">
+        <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-700">
           <button
             type="button"
             aria-label={`Decrease ${item.name} quantity`}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-700 transition active:scale-90 disabled:opacity-30 dark:text-slate-200"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
             disabled={!canDecrement}
             onClick={() => onAdjustQuantity(item, -1)}
           >
             <Minus className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <span className="min-w-[1.5rem] text-center text-[13px] font-extrabold tabular-nums text-slate-900 dark:text-white">
+          <span className="min-w-[1.75rem] text-center text-[13px] font-extrabold tabular-nums text-slate-900 dark:text-white">
             {item.quantity}
           </span>
           <button
@@ -138,7 +139,7 @@ export const InventoryRow = ({ item, onEdit, onDelete, onAdjustQuantity }: Inven
             aria-label={`More actions for ${item.name}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
             onClick={() => setMenuOpen((open) => !open)}
           >
             <MoreVertical className="h-4 w-4" aria-hidden="true" />

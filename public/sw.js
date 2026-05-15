@@ -19,6 +19,15 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+const isCacheable = (request, response) => {
+  if (!response || response.status !== 200) {
+    return false;
+  }
+
+  const url = new URL(request.url);
+  return url.protocol === "http:" || url.protocol === "https:";
+};
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
@@ -32,8 +41,13 @@ self.addEventListener("fetch", (event) => {
 
       return fetch(event.request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (isCacheable(event.request, response)) {
+            const copy = response.clone();
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(event.request, copy))
+              .catch(() => {});
+          }
           return response;
         })
         .catch(() => caches.match("/index.html"));

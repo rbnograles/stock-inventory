@@ -9,6 +9,7 @@ import type { InventoryCategory, InventoryItem } from "@/types/inventory";
 interface CategorySectionProps {
   category: InventoryCategory;
   items: InventoryItem[];
+  onView: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onAdjustQuantity: (item: InventoryItem, delta: number) => void;
@@ -27,6 +28,7 @@ const categoryEmoji: Record<InventoryCategory, string> = {
 export const CategorySection = ({
   category,
   items,
+  onView,
   onEdit,
   onDelete,
   onAdjustQuantity,
@@ -49,11 +51,12 @@ export const CategorySection = ({
           {items.length}
         </span>
       </div>
-      <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+      <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-card dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
         {sortByExpiryPriority(items).map((item) => (
           <InventoryRow
             key={item.id}
             item={item}
+            onView={onView}
             onEdit={onEdit}
             onDelete={onDelete}
             onAdjustQuantity={onAdjustQuantity}
