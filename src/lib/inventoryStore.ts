@@ -1,8 +1,8 @@
 /**
  * Wraps Supabase inventory persistence behind a small repository API. The UI
  * can keep working with camelCase item objects while this module handles table
- * mapping, authenticated ownership, and the `{ ok, message, data }`-style
- * operational boundary expected from the project.
+ * mapping, authenticated ownership, and clear save/load failures for the PWA's
+ * remote inventory source of truth.
  */
 import { supabase } from "@/lib/supabaseClient";
 import type { InventoryDraft, InventoryItem } from "@/types/inventory";
@@ -25,6 +25,22 @@ interface InventoryRow {
 
 const cleanOptional = (value: string) => value.trim() || undefined;
 const cleanNullable = (value: string | undefined) => value?.trim() || null;
+const NETWORK_ERROR_MESSAGE =
+  "Unable to reach Supabase. Check your connection, reopen the PWA, then try saving again.";
+
+const formatInventoryError = (error: { message?: string }) => {
+  const message = error.message ?? "";
+
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return NETWORK_ERROR_MESSAGE;
+  }
+
+  if (/row-level security|violates row-level security/i.test(message)) {
+    return "Supabase blocked this save. Please sign out, sign back in, and try again.";
+  }
+
+  return message || "Unable to save inventory item.";
+};
 
 const generateId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -112,7 +128,7 @@ export const getInventoryItems = async (userId: string) => {
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(formatInventoryError(error));
   }
 
   return (data as InventoryRow[]).map(mapRowToItem);
@@ -138,7 +154,7 @@ export const saveInventoryItem = async (item: InventoryItem) => {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(formatInventoryError(error));
   }
 };
 
@@ -159,7 +175,7 @@ export const saveInventoryDraft = async (
       .single();
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(formatInventoryError(error));
     }
 
     return mapRowToItem(data as InventoryRow);
@@ -176,7 +192,7 @@ export const saveInventoryDraft = async (
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(formatInventoryError(error));
   }
 
   return mapRowToItem(data as InventoryRow);
@@ -186,6 +202,6 @@ export const deleteInventoryItem = async (id: string) => {
   const { error } = await supabase.from("inventory_items").delete().eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(formatInventoryError(error));
   }
 };

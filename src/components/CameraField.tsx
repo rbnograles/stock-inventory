@@ -1,14 +1,19 @@
 /**
  * Captures or uploads an item photo through the browser's native file picker.
- * Using the `capture` hint gives mobile devices a direct camera path, while
- * still supporting desktop testing and phones that restrict camera streams.
+ * The selected image is normalized to a smaller JPEG data URL before it reaches
+ * Supabase, which keeps mobile PWA saves fast and avoids huge request payloads
+ * from modern phone cameras.
  */
+import { useState } from "react";
 import { Camera, ImagePlus, X } from "lucide-react";
 
 interface CameraFieldProps {
   value: string;
   onChange: (value: string) => void;
 }
+
+const MAX_PHOTO_EDGE = 1280;
+const PHOTO_QUALITY = 0.82;
 
 const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -18,7 +23,46 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+const loadImage = (dataUrl: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Unable to prepare selected image."));
+    image.src = dataUrl;
+  });
+
+const resizePhotoDataUrl = async (file: File) => {
+  const originalDataUrl = await readFileAsDataUrl(file);
+
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+    return originalDataUrl;
+  }
+
+  const image = await loadImage(originalDataUrl);
+  const largestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+
+  if (!largestEdge || largestEdge <= MAX_PHOTO_EDGE) {
+    return originalDataUrl;
+  }
+
+  const scale = MAX_PHOTO_EDGE / largestEdge;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(image.naturalWidth * scale);
+  canvas.height = Math.round(image.naturalHeight * scale);
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return originalDataUrl;
+  }
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", PHOTO_QUALITY);
+};
+
 export const CameraField = ({ value, onChange }: CameraFieldProps) => {
+  const [error, setError] = useState("");
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -26,8 +70,15 @@ export const CameraField = ({ value, onChange }: CameraFieldProps) => {
       return;
     }
 
-    onChange(await readFileAsDataUrl(file));
-    event.target.value = "";
+    setError("");
+
+    try {
+      onChange(await resizePhotoDataUrl(file));
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : "Unable to prepare selected image.");
+    } finally {
+      event.target.value = "";
+    }
   };
 
   return (
@@ -78,6 +129,11 @@ export const CameraField = ({ value, onChange }: CameraFieldProps) => {
           onChange={handleFileChange}
         />
       </label>
+      {error ? (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 };
