@@ -1,7 +1,9 @@
 /**
  * Handles create and edit flows in one mobile-first sheet-style dialog. The
  * form keeps all fields local until submit, which makes edits reversible and
- * keeps barcode/photo data local until Supabase persistence succeeds.
+ * keeps barcode/photo data local until Supabase persistence succeeds. Submit
+ * failures are surfaced through the app-level toast so they stay readable on
+ * compact mobile PWA screens.
  */
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Barcode, Calendar, ChevronDown, MapPin, Package, Pencil, Sparkles, Tag, X } from "lucide-react";
@@ -15,6 +17,7 @@ interface ItemFormDialogProps {
   categories: Category[];
   onClose: () => void;
   onManageCategories?: () => void;
+  onError?: (message: string) => void;
   onSubmit: (draft: InventoryDraft, item?: InventoryItem) => Promise<void>;
 }
 
@@ -81,12 +84,12 @@ export const ItemFormDialog = ({
   categories,
   onClose,
   onManageCategories,
+  onError,
   onSubmit,
 }: ItemFormDialogProps) => {
   const defaultCategory = categories[0]?.name ?? "Other";
   const [draft, setDraft] = useState<InventoryDraft>({ ...EMPTY_DRAFT, category: defaultCategory });
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
   const editing = Boolean(item);
   const title = editing ? "Edit item" : "Add item";
   const subtitle = editing ? "Update details, expiry, or quantity" : "Track a new household product";
@@ -99,7 +102,6 @@ export const ItemFormDialog = ({
         category: initial.category || defaultCategory,
         barcode: item?.barcode ?? "",
       });
-      setError("");
     }
   }, [defaultCategory, item, open]);
 
@@ -126,16 +128,15 @@ export const ItemFormDialog = ({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isValid) {
-      setError("Item name and quantity are required.");
+      onError?.("Item name and quantity are required.");
       return;
     }
     setIsSaving(true);
-    setError("");
     try {
       await onSubmit(draft, item);
       onClose();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to save item.");
+      onError?.(submitError instanceof Error ? submitError.message : "Unable to save item.");
     } finally {
       setIsSaving(false);
     }
@@ -294,11 +295,6 @@ export const ItemFormDialog = ({
 
           <CameraField value={draft.photoDataUrl} onChange={(value) => updateDraft("photoDataUrl", value)} />
 
-          {error ? (
-            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
-              {error}
-            </p>
-          ) : null}
         </div>
 
         <footer className="hs-modal-footer">

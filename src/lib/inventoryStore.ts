@@ -1,8 +1,8 @@
 /**
  * Wraps Supabase inventory persistence behind a small repository API. The UI
  * can keep working with camelCase item objects while this module handles table
- * mapping, authenticated ownership, and clear save/load failures for the PWA's
- * remote inventory source of truth.
+ * mapping, authenticated ownership, retryable writes, and clear save/load
+ * failures for the PWA's remote inventory source of truth.
  */
 import { supabase } from "@/lib/supabaseClient";
 import type { InventoryDraft, InventoryItem } from "@/types/inventory";
@@ -27,6 +27,8 @@ const cleanOptional = (value: string) => value.trim() || undefined;
 const cleanNullable = (value: string | undefined) => value?.trim() || null;
 const NETWORK_ERROR_MESSAGE =
   "Unable to reach Supabase. Check your connection, reopen the PWA, then try saving again.";
+const MUTATION_RETRY_LIMIT = 3;
+const RETRY_DELAYS_MS = [350, 900];
 
 const formatInventoryError = (error: { message?: string }) => {
   const message = error.message ?? "";
@@ -40,6 +42,64 @@ const formatInventoryError = (error: { message?: string }) => {
   }
 
   return message || "Unable to save inventory item.";
+};
+
+const wait = (delayMs: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  });
+
+const isRetryableInventoryError = (error: { code?: string; message?: string; status?: number }) => {
+  const message = error.message ?? "";
+
+  if (/row-level security|violates row-level security|duplicate key|check constraint|invalid input/i.test(message)) {
+    return false;
+  }
+
+  if (error.status && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429) {
+    return false;
+  }
+
+  if (error.code && ["23505", "23514", "22P02", "42501"].includes(error.code)) {
+    return false;
+  }
+
+  return true;
+};
+
+const withInventoryMutationRetry = async <Data>(
+  operation: () => PromiseLike<{
+    data: Data | null;
+    error: { code?: string; message?: string; status?: number } | null;
+  }>,
+) => {
+  let lastError: { code?: string; message?: string; status?: number } | null = null;
+
+  for (let attempt = 1; attempt <= MUTATION_RETRY_LIMIT; attempt += 1) {
+    try {
+      const { data, error } = await operation();
+
+      if (!error) {
+        return data;
+      }
+
+      lastError = error;
+
+      if (!isRetryableInventoryError(error) || attempt === MUTATION_RETRY_LIMIT) {
+        break;
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? { message: error.message } : { message: "Unable to save inventory item." };
+
+      if (attempt === MUTATION_RETRY_LIMIT) {
+        break;
+      }
+    }
+
+    await wait(RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]);
+  }
+
+  throw new Error(formatInventoryError(lastError ?? {}));
 };
 
 const generateId = (): string => {
@@ -149,13 +209,11 @@ export const saveInventoryItem = async (item: InventoryItem) => {
     photo_data_url: item.photoDataUrl ?? null,
   };
 
-  const { error } = await supabase.from("inventory_items").upsert(payload, {
-    onConflict: "id",
-  });
-
-  if (error) {
-    throw new Error(formatInventoryError(error));
-  }
+  await withInventoryMutationRetry(() =>
+    supabase.from("inventory_items").upsert(payload, {
+      onConflict: "id",
+    }),
+  );
 };
 
 export const saveInventoryDraft = async (
@@ -164,44 +222,48 @@ export const saveInventoryDraft = async (
   current?: InventoryItem,
 ) => {
   if (current) {
-    const { data, error } = await supabase
-      .from("inventory_items")
-      .update({
-        ...draftToPayload(draft),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", current.id)
-      .select("*")
-      .single();
+    const data = await withInventoryMutationRetry<InventoryRow>(() =>
+      supabase
+        .from("inventory_items")
+        .update({
+          ...draftToPayload(draft),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", current.id)
+        .select("*")
+        .single(),
+    );
 
-    if (error) {
-      throw new Error(formatInventoryError(error));
+    if (!data) {
+      throw new Error("Unable to save inventory item.");
     }
 
-    return mapRowToItem(data as InventoryRow);
+    return mapRowToItem(data);
   }
 
-  const { data, error } = await supabase
-    .from("inventory_items")
-    .insert({
-      id: generateId(),
-      user_id: userId,
-      ...draftToPayload(draft),
-    })
-    .select("*")
-    .single();
+  const id = generateId();
+  const data = await withInventoryMutationRetry<InventoryRow>(() =>
+    supabase
+      .from("inventory_items")
+      .upsert(
+        {
+          id,
+          user_id: userId,
+          ...draftToPayload(draft),
+        },
+        { onConflict: "id" },
+      )
+      .select("*")
+      .single(),
+  );
 
-  if (error) {
-    throw new Error(formatInventoryError(error));
+  if (!data) {
+    throw new Error("Unable to save inventory item.");
   }
 
-  return mapRowToItem(data as InventoryRow);
+  return mapRowToItem(data);
 };
 
 export const deleteInventoryItem = async (id: string) => {
-  const { error } = await supabase.from("inventory_items").delete().eq("id", id);
-
-  if (error) {
-    throw new Error(formatInventoryError(error));
-  }
+  await withInventoryMutationRetry(() => supabase.from("inventory_items").delete().eq("id", id));
 };

@@ -1,14 +1,15 @@
 /**
- * Displays short-lived success feedback from app-level mutations. The shell
- * owns timing while this component keeps the toast accessible, dismissible, and
- * visually clear above the mobile bottom navigation.
+ * Displays short-lived feedback from app-level mutations. The shell owns timing
+ * while this component keeps success and error notices accessible, dismissible,
+ * and visually clear above the mobile bottom navigation.
  */
-import { CheckCircle2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, X } from "lucide-react";
 
 export interface ToastMessage {
   id: number;
   title: string;
   detail?: string;
+  tone?: "success" | "error";
 }
 
 interface ToastNotificationProps {
@@ -21,20 +22,38 @@ export const ToastNotification = ({ message, onDismiss }: ToastNotificationProps
     return null;
   }
 
+  const isError = message.tone === "error";
+
   return (
     <div
-      role="status"
-      aria-live="polite"
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
       className="pointer-events-none fixed inset-x-0 top-0 z-50 mx-auto max-w-xl px-4 pt-[max(1rem,env(safe-area-inset-top))]"
     >
-      <div className="pointer-events-auto flex items-start gap-3 rounded-3xl border border-emerald-200 bg-white/95 p-4 shadow-soft backdrop-blur dark:border-emerald-900/70 dark:bg-slate-900/95">
-        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+      <div
+        className={`pointer-events-auto flex items-start gap-3 rounded-3xl border bg-white/95 p-4 shadow-soft backdrop-blur dark:bg-slate-900/95 ${
+          isError
+            ? "border-rose-200 dark:border-rose-900/70"
+            : "border-emerald-200 dark:border-emerald-900/70"
+        }`}
+      >
+        <span
+          className={`flex h-10 w-10 flex-none items-center justify-center rounded-2xl ${
+            isError
+              ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+          }`}
+        >
+          {isError ? (
+            <AlertCircle className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-extrabold hs-text-primary">{message.title}</p>
           {message.detail ? (
-            <p className="mt-0.5 truncate text-xs font-semibold hs-text-muted">{message.detail}</p>
+            <p className="mt-0.5 break-words text-xs font-semibold hs-text-muted">{message.detail}</p>
           ) : null}
         </div>
         <button

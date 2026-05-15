@@ -5,6 +5,7 @@
  */
 import { AlertTriangle, CheckCircle2, CircleHelp, TimerReset } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { formatExpiryMonthDistance } from "@/lib/expiry";
 import type { InventoryHealthSummary, InventoryWatchItem } from "@/lib/insights";
 
 const HEALTH_ROWS = [
@@ -15,9 +16,9 @@ const HEALTH_ROWS = [
 ] as const;
 
 const watchCopy = (item: InventoryWatchItem) => {
-  if (item.daysUntilExpiry < 0) return `Expired ${Math.abs(item.daysUntilExpiry)}d ago`;
+  if (item.daysUntilExpiry < 0) return `Expired ${formatExpiryMonthDistance(item.daysUntilExpiry)} ago`;
   if (item.daysUntilExpiry === 0) return "Expires today";
-  return `Use in ${item.daysUntilExpiry}d`;
+  return `Use in ${formatExpiryMonthDistance(item.daysUntilExpiry)}`;
 };
 
 export const InventoryHealthPanel = ({

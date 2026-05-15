@@ -8,7 +8,7 @@
 import { type ReactNode } from "react";
 import { ChevronRight, Plus, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import { emojiForCategory, toneForCategory } from "@/lib/categoryVisuals";
-import { getDaysUntilExpiry, getExpiryStatus, sortByExpiryPriority } from "@/lib/expiry";
+import { getExpiryLabel, getExpiryStatus, sortByExpiryPriority } from "@/lib/expiry";
 import type { Category } from "@/types/category";
 import type { InventoryItem } from "@/types/inventory";
 
@@ -49,14 +49,6 @@ const buildDigest = (items: InventoryItem[]): DigestEntry[] => {
   }
 
   return entries.slice(0, 3);
-};
-
-const formatDaysCopy = (item: InventoryItem) => {
-  const days = getDaysUntilExpiry(item.expiryDate);
-  if (days === null) return "No expiry date";
-  if (days < 0) return `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`;
-  if (days === 0) return "Expires today";
-  return `Use within ${days} day${days === 1 ? "" : "s"}`;
 };
 
 export const DailyDigestCard = ({
@@ -233,7 +225,7 @@ const DigestItemRow = ({
   const categoryEmoji = emojiForCategory(item.category, categories);
   const initials = item.name.slice(0, 2).toUpperCase();
   const status = getExpiryStatus(item.expiryDate);
-  const dateCopy = formatDaysCopy(item);
+  const dateCopy = getExpiryLabel(item);
 
   const statusDot =
     status === "expired"

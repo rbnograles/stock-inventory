@@ -134,7 +134,11 @@ export default function App() {
   }, [toast]);
 
   const notifySuccess = (title: string, detail?: string) => {
-    setToast({ id: Date.now(), title, detail });
+    setToast({ id: Date.now(), title, detail, tone: "success" });
+  };
+
+  const notifyError = (title: string, detail?: string) => {
+    setToast({ id: Date.now(), title, detail, tone: "error" });
   };
 
   const filteredItems = useMemo(
@@ -440,6 +444,7 @@ export default function App() {
         categories={categories}
         onClose={() => setFormOpen(false)}
         onManageCategories={openManageCategories}
+        onError={(message) => notifyError("Inventory not saved", message)}
         onSubmit={async (draft, current) => {
           const saved = await saveDraft(draft, current);
           notifySuccess(current ? "Item updated" : "Item added", saved.name);
