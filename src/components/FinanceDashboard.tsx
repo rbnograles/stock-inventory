@@ -3,12 +3,17 @@
  * filter controls, then a grouped transaction list. Month scoping is handled
  * locally so the user can scrub backwards without re-loading the network.
  */
-import { useMemo } from "react";
-import { Filter, Inbox, MinusCircle, PlusCircle, Settings2, TrendingUp } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarDays, Filter, Inbox, List, MinusCircle, PlusCircle, Settings2, TrendingUp } from "lucide-react";
+import { FinanceCalendar } from "@/components/FinanceCalendar";
 import { FinanceSummaryCard } from "@/components/FinanceSummaryCard";
+import { OperationalFundsPanel } from "@/components/OperationalFundsPanel";
 import { TransactionRow } from "@/components/TransactionRow";
+import { countsAgainstCashFlow, getOperationalFundSummaries } from "@/lib/financeOperational";
 import { formatMoney } from "@/lib/money";
 import type { FinanceCategory, Transaction, TransactionKind } from "@/types/finance";
+
+type FinanceViewMode = "list" | "calendar";
 
 interface FinanceDashboardProps {
   transactions: Transaction[];
@@ -24,6 +29,7 @@ interface FinanceDashboardProps {
   onEditTransaction: (transaction: Transaction) => void;
   onDeleteTransaction: (transaction: Transaction) => void;
   onAddTransaction: () => void;
+  onAddOperationalSpend: (fundId: string) => void;
   onManageCategories: () => void;
 }
 
@@ -77,8 +83,10 @@ export const FinanceDashboard = ({
   onEditTransaction,
   onDeleteTransaction,
   onAddTransaction,
+  onAddOperationalSpend,
   onManageCategories,
 }: FinanceDashboardProps) => {
+  const [viewMode, setViewMode] = useState<FinanceViewMode>("list");
   const referenceDate = useMemo(() => shiftMonth(monthOffset), [monthOffset]);
   const selectedKey = monthKey(referenceDate);
 
@@ -99,6 +107,7 @@ export const FinanceDashboard = ({
     let income = 0;
     let expense = 0;
     monthTransactions.forEach((entry) => {
+      if (!countsAgainstCashFlow(entry)) return;
       if (entry.kind === "income") income += entry.amount;
       else expense += entry.amount;
     });
@@ -108,7 +117,7 @@ export const FinanceDashboard = ({
   const topExpenseCategories = useMemo(() => {
     const totalsByCategory = new Map<string, number>();
     monthTransactions
-      .filter((entry) => entry.kind === "expense")
+      .filter((entry) => entry.kind === "expense" && countsAgainstCashFlow(entry))
       .forEach((entry) => {
         totalsByCategory.set(
           entry.category,
@@ -120,6 +129,11 @@ export const FinanceDashboard = ({
       .slice(0, 3);
   }, [monthTransactions]);
 
+  const operationalFunds = useMemo(
+    () => getOperationalFundSummaries(transactions),
+    [transactions],
+  );
+
   const grouped = useMemo(() => groupByDay(filtered), [filtered]);
 
   const visibleCategories = useMemo(() => {
@@ -128,7 +142,7 @@ export const FinanceDashboard = ({
   }, [categories, kindFilter]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mt-2">
       <FinanceSummaryCard
         monthLabel={monthLabel(referenceDate)}
         income={totals.income}
@@ -139,24 +153,26 @@ export const FinanceDashboard = ({
         atCurrentMonth={monthOffset === 0}
       />
 
+      <OperationalFundsPanel funds={operationalFunds} onAddSpend={onAddOperationalSpend} />
+
       {topExpenseCategories.length > 0 ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+        <section className="hs-surface p-4">
+          <h3 className="flex items-center gap-2 hs-eyebrow">
             <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
             Top expense categories
           </h3>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-2.5">
             {topExpenseCategories.map(([name, amount]) => {
               const share = totals.expense > 0 ? Math.min(100, Math.round((amount / totals.expense) * 100)) : 0;
               const meta = categories.find((entry) => entry.name === name && entry.kind === "expense");
               return (
                 <li key={name} className="space-y-1">
                   <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="flex min-w-0 items-center gap-2 text-slate-700 dark:text-slate-200">
+                    <span className="flex min-w-0 items-center gap-2 hs-text-secondary">
                       <span aria-hidden="true">{meta?.emoji ?? "💸"}</span>
                       <span className="truncate font-semibold">{name}</span>
                     </span>
-                    <span className="flex-none text-xs font-bold tabular-nums text-slate-500 dark:text-slate-400">
+                    <span className="flex-none text-xs font-bold tabular-nums hs-text-muted">
                       {formatMoney(amount)} · {share}%
                     </span>
                   </div>
@@ -174,25 +190,45 @@ export const FinanceDashboard = ({
       ) : null}
 
       <section className="space-y-3" aria-label="Filter transactions">
-        <div className="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-card dark:bg-slate-900">
-          <FilterPill
-            active={kindFilter === "all"}
-            onClick={() => onKindFilterChange("all")}
-            icon={<Filter className="h-4 w-4" aria-hidden="true" />}
-            label="All"
-          />
-          <FilterPill
-            active={kindFilter === "income"}
-            onClick={() => onKindFilterChange("income")}
-            icon={<PlusCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" />}
-            label="Income"
-          />
-          <FilterPill
-            active={kindFilter === "expense"}
-            onClick={() => onKindFilterChange("expense")}
-            icon={<MinusCircle className="h-4 w-4 text-rose-500" aria-hidden="true" />}
-            label="Expense"
-          />
+        <div className="flex items-center gap-2">
+          <div className="hs-surface flex flex-1 items-center gap-1 p-1">
+            <FilterPill
+              active={kindFilter === "all"}
+              onClick={() => onKindFilterChange("all")}
+              icon={<Filter className="h-4 w-4" aria-hidden="true" />}
+              label="All"
+            />
+            <FilterPill
+              active={kindFilter === "income"}
+              onClick={() => onKindFilterChange("income")}
+              icon={<PlusCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" />}
+              label="Income"
+            />
+            <FilterPill
+              active={kindFilter === "expense"}
+              onClick={() => onKindFilterChange("expense")}
+              icon={<MinusCircle className="h-4 w-4 text-rose-500" aria-hidden="true" />}
+              label="Expense"
+            />
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="Finance view"
+            className="inline-flex flex-none items-center gap-1 rounded-2xl bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+          >
+            <ViewModeButton
+              active={viewMode === "list"}
+              onClick={() => setViewMode("list")}
+              label="List view"
+              icon={<List className="h-4 w-4" aria-hidden="true" />}
+            />
+            <ViewModeButton
+              active={viewMode === "calendar"}
+              onClick={() => setViewMode("calendar")}
+              label="Calendar view"
+              icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
+            />
+          </div>
         </div>
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
@@ -211,11 +247,7 @@ export const FinanceDashboard = ({
               onClick={() => onCategoryFilterChange(category.name)}
             />
           ))}
-          <button
-            type="button"
-            onClick={onManageCategories}
-            className="flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:border-teal-400 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-400 dark:hover:text-teal-200"
-          >
+          <button type="button" onClick={onManageCategories} className="hs-pill-ghost">
             <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             Manage
           </button>
@@ -227,47 +259,46 @@ export const FinanceDashboard = ({
           {error}
         </p>
       ) : null}
-      {isLoading ? (
-        <p className="py-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-          Loading transactions…
-        </p>
+
+      {viewMode === "calendar" ? (
+        <FinanceCalendar
+          referenceDate={referenceDate}
+          monthTransactions={filtered}
+          categories={categories}
+          onEditTransaction={onEditTransaction}
+          onDeleteTransaction={onDeleteTransaction}
+          onAddTransaction={onAddTransaction}
+        />
       ) : null}
 
-      {!isLoading && filtered.length === 0 ? (
+      {viewMode === "list" && filtered.length === 0 ? (
         <section className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/60 p-10 text-center shadow-card backdrop-blur dark:border-slate-700 dark:bg-slate-900/40">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-soft">
             <Inbox className="h-7 w-7" aria-hidden="true" />
           </span>
           <div className="space-y-1">
-            <p className="text-base font-extrabold text-slate-900 dark:text-white">
-              Nothing logged here yet
-            </p>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              Add a transaction to start tracking this month.
-            </p>
+            <p className="text-base font-extrabold hs-text-primary">Nothing logged here yet</p>
+            <p className="text-sm font-medium hs-text-muted">Add a transaction to start tracking this month.</p>
           </div>
-          <button
-            type="button"
-            onClick={onAddTransaction}
-            className="rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-2 text-sm font-bold text-white shadow-soft transition active:scale-[0.98] hover:brightness-110"
-          >
+          <button type="button" onClick={onAddTransaction} className="hs-btn-primary px-5 py-2">
             Add transaction
           </button>
         </section>
       ) : null}
 
-      <div className="space-y-4">
+      <div className={`space-y-4 ${viewMode === "list" ? "" : "hidden"}`}>
         {grouped.map(([day, entries]) => {
           const dayTotal = entries.reduce(
-            (sum, entry) => sum + (entry.kind === "income" ? entry.amount : -entry.amount),
+            (sum, entry) =>
+              countsAgainstCashFlow(entry)
+                ? sum + (entry.kind === "income" ? entry.amount : -entry.amount)
+                : sum,
             0,
           );
           return (
             <section key={day} className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  {formatDayHeading(day)}
-                </h3>
+                <h3 className="text-sm font-bold hs-text-primary">{formatDayHeading(day)}</h3>
                 <span
                   className={`text-[11px] font-bold tabular-nums ${
                     dayTotal >= 0
@@ -279,7 +310,7 @@ export const FinanceDashboard = ({
                   {formatMoney(Math.abs(dayTotal))}
                 </span>
               </div>
-              <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-card dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+              <div className="hs-surface hs-divider">
                 {entries.map((transaction) => (
                   <TransactionRow
                     key={transaction.id}
@@ -324,6 +355,33 @@ const FilterPill = ({
   </button>
 );
 
+const ViewModeButton = ({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    role="radio"
+    aria-checked={active}
+    aria-label={label}
+    onClick={onClick}
+    className={`flex h-8 w-9 items-center justify-center rounded-xl transition ${
+      active
+        ? "bg-teal-500 text-white shadow-sm"
+        : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+    }`}
+  >
+    {icon}
+  </button>
+);
+
 const CategoryChip = ({
   active,
   emoji,
@@ -340,11 +398,7 @@ const CategoryChip = ({
     role="tab"
     aria-selected={active}
     onClick={onClick}
-    className={`flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold transition ${
-      active
-        ? "bg-teal-500 text-white shadow-soft"
-        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-    }`}
+    className={active ? "hs-pill-active" : "hs-pill"}
   >
     <span aria-hidden="true">{emoji}</span>
     {label}

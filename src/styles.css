@@ -1,7 +1,7 @@
 /**
- * Establishes the mobile-first app canvas and Tailwind layers. Global styles
- * are intentionally small because most visual decisions live with the React
- * surfaces they support.
+ * Mobile-first app canvas plus the shared component primitives. Tokens live in
+ * `@layer components` so every dialog, card, button, and chip pulls from the
+ * same source — change a radius or color here and the whole app moves with it.
  */
 @tailwind base;
 @tailwind components;
@@ -32,7 +32,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f0fdfa;
+  background-color: #f8fafc;
   color: #0f172a;
   overscroll-behavior-y: contain;
 }
@@ -54,20 +54,138 @@ select {
   -webkit-tap-highlight-color: transparent;
 }
 
+@layer components {
+  /* Surfaces */
+  .hs-surface {
+    @apply rounded-3xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900;
+  }
+  .hs-surface-flat {
+    @apply rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900;
+  }
+  .hs-surface-muted {
+    @apply rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40;
+  }
+  .hs-tile {
+    @apply rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900;
+  }
+  .hs-tile-muted {
+    @apply rounded-2xl bg-slate-50 dark:bg-slate-800/60;
+  }
+  .hs-divider {
+    @apply divide-y divide-slate-100 dark:divide-slate-800;
+  }
+
+  /* Eyebrows & headings */
+  .hs-eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400;
+  }
+  .hs-eyebrow-tight {
+    @apply text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400;
+  }
+  .hs-section-title {
+    @apply flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white;
+  }
+  .hs-text-primary {
+    @apply text-slate-900 dark:text-white;
+  }
+  .hs-text-secondary {
+    @apply text-slate-600 dark:text-slate-300;
+  }
+  .hs-text-muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  /* Inputs */
+  .hs-input {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500;
+  }
+  .hs-date-input-wrap {
+    @apply max-w-[13.5rem];
+  }
+  .hs-date-input {
+    @apply min-w-0 pr-3;
+  }
+  .hs-field-label {
+    @apply block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400;
+  }
+
+  /* Buttons */
+  .hs-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .hs-btn-primary {
+    @apply hs-btn bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-soft hover:brightness-110 disabled:shadow-none;
+  }
+  .hs-btn-danger {
+    @apply hs-btn bg-rose-600 text-white shadow-card hover:bg-rose-500 dark:bg-rose-500 dark:hover:bg-rose-400;
+  }
+  .hs-btn-secondary {
+    @apply hs-btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+  .hs-btn-ghost {
+    @apply hs-btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+  .hs-btn-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  /* Pills */
+  .hs-pill {
+    @apply inline-flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+  .hs-pill-active {
+    @apply inline-flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-teal-500 px-3.5 text-sm font-semibold text-white shadow-soft;
+  }
+  .hs-pill-ghost {
+    @apply inline-flex h-9 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:border-teal-400 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-400 dark:hover:text-teal-200;
+  }
+
+  /* Modal */
+  .hs-modal-overlay {
+    @apply fixed inset-0 z-40 flex items-end justify-center sm:items-center;
+  }
+  .hs-modal-backdrop {
+    @apply absolute inset-0 bg-slate-950/60 backdrop-blur-sm;
+  }
+  .hs-modal-shell {
+    @apply relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden border border-slate-200 bg-white shadow-soft animate-pop-in rounded-t-3xl sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900;
+  }
+  .hs-modal-header {
+    @apply flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800;
+  }
+  .hs-modal-body {
+    @apply flex-1 space-y-5 overflow-y-auto px-5 py-5;
+  }
+  .hs-modal-footer {
+    @apply safe-pb flex items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 pt-3 dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  /* Icon badges (gradient leading icons in headers/heroes) */
+  .hs-icon-badge {
+    @apply flex h-10 w-10 flex-none items-center justify-center rounded-2xl text-white shadow-soft;
+  }
+}
+
 @layer utilities {
   .safe-pb {
     padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
   }
-
   .safe-pt {
     padding-top: max(0.25rem, env(safe-area-inset-top));
   }
-
   .scrollbar-hide {
     scrollbar-width: none;
   }
-
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .bg-grid-soft {
+    background-image: linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .dark .bg-grid-soft {
+    background-image: linear-gradient(rgba(241, 245, 249, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(241, 245, 249, 0.04) 1px, transparent 1px);
   }
 }

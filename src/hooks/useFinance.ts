@@ -10,6 +10,7 @@ import {
   deleteTransaction,
   getFinanceCategories,
   getTransactions,
+  renameFinanceTransactionsCategory,
   saveTransactionDraft,
   seedFinanceCategories,
   updateFinanceCategory,
@@ -65,7 +66,12 @@ export const useFinance = (userId?: string) => {
 
       const saved = await saveTransactionDraft(draft, userId, current);
       setTransactions((list) => {
-        const without = list.filter((entry) => entry.id !== saved.id);
+        const normalized = current?.isOperationalFund && !saved.isOperationalFund
+          ? list.map((entry) =>
+              entry.operationalFundId === current.id ? { ...entry, operationalFundId: undefined } : entry,
+            )
+          : list;
+        const without = normalized.filter((entry) => entry.id !== saved.id);
         return [saved, ...without].sort(
           (a, b) =>
             b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt),
@@ -95,11 +101,27 @@ export const useFinance = (userId?: string) => {
     [categories, userId],
   );
 
-  const editCategory = useCallback(async (id: string, draft: FinanceCategoryDraft) => {
-    const updated = await updateFinanceCategory(id, draft);
-    setCategories((list) => list.map((entry) => (entry.id === id ? updated : entry)));
-    return updated;
-  }, []);
+  const editCategory = useCallback(
+    async (id: string, draft: FinanceCategoryDraft) => {
+      const current = categories.find((entry) => entry.id === id);
+      const updated = await updateFinanceCategory(id, draft);
+
+      if (userId && current && current.kind === updated.kind && current.name !== updated.name) {
+        await renameFinanceTransactionsCategory(userId, current.kind, current.name, updated.name);
+        setTransactions((list) =>
+          list.map((entry) =>
+            entry.kind === current.kind && entry.category === current.name
+              ? { ...entry, category: updated.name }
+              : entry,
+          ),
+        );
+      }
+
+      setCategories((list) => list.map((entry) => (entry.id === id ? updated : entry)));
+      return updated;
+    },
+    [categories, userId],
+  );
 
   const removeCategory = useCallback(async (id: string) => {
     await deleteFinanceCategory(id);

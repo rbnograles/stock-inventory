@@ -4,31 +4,52 @@
  * tables, and the bottom bar routes the primary add action to the active tool.
  */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { AttentionCard } from "@/components/AttentionCard";
+import { DailyDigestCard } from "@/components/DailyDigestCard";
+import { InventoryGreeting } from "@/components/InventoryGreeting";
 import { AuthGate } from "@/components/AuthGate";
 import { BottomNav, type AppView } from "@/components/BottomNav";
 import { CategoryManagerDialog } from "@/components/CategoryManagerDialog";
-import { CategorySection } from "@/components/CategorySection";
+import { CategorySection, type InventoryViewMode } from "@/components/CategorySection";
+import { ViewToggle } from "@/components/ViewToggle";
 import { EmptyInventoryState } from "@/components/EmptyInventoryState";
 import { FinanceCategoryManagerDialog } from "@/components/FinanceCategoryManagerDialog";
 import { FinanceDashboard } from "@/components/FinanceDashboard";
-import { InsightsDashboard } from "@/components/InsightsDashboard";
 import { InventoryControls, type CategoryFilter } from "@/components/InventoryControls";
-import { InventoryGreeting } from "@/components/InventoryGreeting";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ItemDetailDialog } from "@/components/ItemDetailDialog";
 import { ItemFormDialog } from "@/components/ItemFormDialog";
 import { ProfileDashboard } from "@/components/ProfileDashboard";
+import { FinanceSkeleton, InsightsSkeleton, InventorySkeleton } from "@/components/skeletons";
+import { ToastNotification, type ToastMessage } from "@/components/ToastNotification";
 import { TransactionFormDialog } from "@/components/TransactionFormDialog";
 import { getExpiryStatus } from "@/lib/expiry";
+import { getOperationalFundSummaries } from "@/lib/financeOperational";
+import { getDisplayName, getStoredDisplayName } from "@/lib/userProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useCategories } from "@/hooks/useCategories";
+import { useCurrency } from "@/hooks/useCurrency";
 import { useFinance } from "@/hooks/useFinance";
 import { useInventory } from "@/hooks/useInventory";
+import { usePersistedState } from "@/hooks/usePersistedState";
+
+const APP_VIEWS: readonly AppView[] = ["inventory", "finance", "insights", "profile"];
+const isAppView = (value: unknown): value is AppView =>
+  typeof value === "string" && (APP_VIEWS as readonly string[]).includes(value);
+
+const initialDarkMode = (): boolean => {
+  try {
+    const stored = window.localStorage.getItem("homestock-theme");
+    if (stored === "dark") return true;
+    if (stored === "light") return false;
+  } catch {
+    // ignore
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
 import { type Transaction } from "@/types/finance";
 import { type InventoryItem } from "@/types/inventory";
 
-const ScannerDialog = lazy(() => import("@/components/ScannerDialog").then((module) => ({ default: module.ScannerDialog })));
+const InsightsDashboard = lazy(() => import("@/components/InsightsDashboard").then((module) => ({ default: module.InsightsDashboard })));
 
 const matchesSearch = (item: InventoryItem, search: string) => {
   const query = search.trim().toLowerCase();
@@ -47,7 +68,7 @@ const needsAttention = (item: InventoryItem) => ["expired", "soon"].includes(get
 export default function App() {
   const {
     user, isPasswordRecovery, prefersResetPassword, isLoading: authLoading,
-    error: authError, clearError, clearPasswordRecovery, signOut,
+    error: authError, clearError, clearPasswordRecovery, signOut, updateDisplayName,
   } = useAuth();
   const { items, totalUnits, isLoading, error, saveDraft, removeItem, adjustQuantity } = useInventory(user?.id);
   const {
@@ -58,33 +79,56 @@ export default function App() {
     removeCategory,
   } = useCategories(user?.id);
   const finance = useFinance(user?.id);
-  const [view, setView] = useState<AppView>("inventory");
+  const { currency, setCurrency: changeCurrency } = useCurrency();
+  const [view, setView] = usePersistedState<AppView>("homestock-view", "inventory", isAppView);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [attentionOnly, setAttentionOnly] = useState(false);
+  const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>("list");
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState<InventoryItem | undefined>();
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [passwordUpdateRequested, setPasswordUpdateRequested] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
   const [pendingDelete, setPendingDelete] = useState<InventoryItem | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [scannedBarcode, setScannedBarcode] = useState("");
   const [financeMonthOffset, setFinanceMonthOffset] = useState(0);
   const [financeKindFilter, setFinanceKindFilter] = useState<"all" | "income" | "expense">("all");
   const [financeCategoryFilter, setFinanceCategoryFilter] = useState("All");
   const [transactionFormOpen, setTransactionFormOpen] = useState(false);
   const [financeCategoryManagerOpen, setFinanceCategoryManagerOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
+  const [initialOperationalFundId, setInitialOperationalFundId] = useState("");
   const [pendingTransactionDelete, setPendingTransactionDelete] = useState<Transaction | undefined>();
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [darkMode, setDarkMode] = useState<boolean>(initialDarkMode);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
+    try {
+      window.localStorage.setItem("homestock-theme", darkMode ? "dark" : "light");
+    } catch {
+      // ignore
+    }
   }, [darkMode]);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setToast((current) => (current?.id === toast.id ? null : current));
+    }, 2800);
+
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  const notifySuccess = (title: string, detail?: string) => {
+    setToast({ id: Date.now(), title, detail });
+  };
 
   const filteredItems = useMemo(
     () =>
@@ -118,16 +162,28 @@ export default function App() {
     }));
   }, [categories, filteredItems]);
 
+  const operationalFunds = useMemo(
+    () => getOperationalFundSummaries(finance.transactions).map((entry) => entry.fund),
+    [finance.transactions],
+  );
+
   const openAddForm = () => {
     setView("inventory");
     setEditingItem(undefined);
-    setScannedBarcode("");
     setFormOpen(true);
   };
 
   const openAddTransaction = () => {
     setView("finance");
     setEditingTransaction(undefined);
+    setInitialOperationalFundId("");
+    setTransactionFormOpen(true);
+  };
+
+  const openAddOperationalSpend = (fundId: string) => {
+    setView("finance");
+    setEditingTransaction(undefined);
+    setInitialOperationalFundId(fundId);
     setTransactionFormOpen(true);
   };
 
@@ -142,7 +198,6 @@ export default function App() {
 
   const openEditForm = (item: InventoryItem) => {
     setEditingItem(item);
-    setScannedBarcode("");
     setDetailOpen(false);
     setFormOpen(true);
   };
@@ -150,19 +205,6 @@ export default function App() {
   const openDetailView = (item: InventoryItem) => {
     setViewingItem(item);
     setDetailOpen(true);
-  };
-
-  const handleScan = (barcode: string) => {
-    const existingItem = items.find((item) => item.barcode === barcode);
-    setView("inventory");
-    setEditingItem(existingItem);
-    setScannedBarcode(barcode);
-    setFormOpen(true);
-  };
-
-  const openScanner = () => {
-    setView("inventory");
-    setScannerOpen(true);
   };
 
   const handleDelete = (item: InventoryItem) => {
@@ -176,9 +218,11 @@ export default function App() {
 
     setIsDeleting(true);
     try {
+      const deletedName = pendingDelete.name;
       await removeItem(pendingDelete.id);
       setDetailOpen(false);
       setPendingDelete(undefined);
+      notifySuccess("Item deleted", deletedName);
     } finally {
       setIsDeleting(false);
     }
@@ -186,6 +230,7 @@ export default function App() {
 
   const openEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);
+    setInitialOperationalFundId("");
     setTransactionFormOpen(true);
   };
 
@@ -196,8 +241,10 @@ export default function App() {
 
     setIsDeletingTransaction(true);
     try {
+      const deleted = pendingTransactionDelete;
       await finance.removeTransaction(pendingTransactionDelete.id);
       setPendingTransactionDelete(undefined);
+      notifySuccess("Transaction deleted", `${deleted.kind === "income" ? "Income" : "Expense"} · ${deleted.category}`);
     } finally {
       setIsDeletingTransaction(false);
     }
@@ -230,16 +277,22 @@ export default function App() {
       onClearPasswordRecovery={handlePasswordUpdateComplete}
     >
       <div className="relative min-h-[100svh] bg-vibe-light pb-32 text-slate-900 dark:bg-vibe-dark dark:text-slate-100">
-      <main className="safe-pt mx-auto max-w-xl space-y-4 px-4 py-4">
+      <main className="safe-pt mx-auto max-w-xl space-y-5 px-4 pb-10 pt-14">
         {view === "inventory" ? (
-          <>
-            <InventoryGreeting email={user?.email} itemCount={items.length} totalUnits={totalUnits} />
-
-            <AttentionCard
+          isLoading ? (
+            <InventorySkeleton />
+          ) : (
+          <div className="mt-2">
+            <InventoryGreeting displayName={getDisplayName(user)} />
+            <DailyDigestCard
               items={items}
               totalUnits={totalUnits}
+              categories={categories}
               attentionActive={attentionOnly}
+              isLoading={isLoading}
               onToggleAttention={() => setAttentionOnly((current) => !current)}
+              onOpenItem={openDetailView}
+              onAddItem={openAddForm}
             />
 
             <InventoryControls
@@ -249,7 +302,6 @@ export default function App() {
               onCategoryChange={setCategory}
               onSearchChange={setSearch}
               onManageCategories={openManageCategories}
-              onScan={openScanner}
             />
 
             {authError || error ? (
@@ -257,10 +309,14 @@ export default function App() {
                 {authError ?? error}
               </p>
             ) : null}
-            {isLoading ? (
-              <p className="py-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-                Loading inventory…
-              </p>
+
+            {filteredItems.length > 0 ? (
+              <div className="flex items-center justify-between px-1 pt-1 mt-2">
+                <p className="text-xs font-semibold hs-text-muted">
+                  {filteredItems.length} item{filteredItems.length === 1 ? "" : "s"}
+                </p>
+                <ViewToggle mode={inventoryViewMode} onChange={setInventoryViewMode} />
+              </div>
             ) : null}
 
             <div className="space-y-4">
@@ -271,6 +327,7 @@ export default function App() {
                   emoji={group.emoji}
                   items={group.items}
                   categories={categories}
+                  viewMode={inventoryViewMode}
                   onView={openDetailView}
                   onEdit={openEditForm}
                   onDelete={handleDelete}
@@ -279,7 +336,7 @@ export default function App() {
               ))}
             </div>
 
-            {!isLoading && filteredItems.length === 0 ? (
+            {filteredItems.length === 0 ? (
               <EmptyInventoryState
                 attentionOnly={attentionOnly}
                 hasFilters={Boolean(attentionOnly || search || category !== "All")}
@@ -290,8 +347,12 @@ export default function App() {
                 }}
               />
             ) : null}
-          </>
+          </div>
+          )
         ) : view === "finance" ? (
+          finance.isLoading ? (
+            <FinanceSkeleton />
+          ) : (
           <FinanceDashboard
             transactions={finance.transactions}
             categories={finance.categories}
@@ -306,17 +367,35 @@ export default function App() {
             onEditTransaction={openEditTransaction}
             onDeleteTransaction={setPendingTransactionDelete}
             onAddTransaction={openAddTransaction}
+            onAddOperationalSpend={openAddOperationalSpend}
             onManageCategories={openManageFinanceCategories}
           />
+          )
         ) : view === "insights" ? (
-          <InsightsDashboard items={items} totalUnits={totalUnits} transactions={finance.transactions} />
+          isLoading || finance.isLoading ? (
+            <InsightsSkeleton />
+          ) : (
+          <Suspense fallback={<InsightsSkeleton />}>
+            <InsightsDashboard
+              items={items}
+              totalUnits={totalUnits}
+              transactions={finance.transactions}
+              financeCategories={finance.categories}
+            />
+          </Suspense>
+          )
         ) : (
           <ProfileDashboard
             darkMode={darkMode}
             email={user?.email}
+            displayName={getDisplayName(user)}
+            storedDisplayName={getStoredDisplayName(user)}
             inventoryCategoryCount={categories.length}
             financeCategoryCount={finance.categories.length}
+            currency={currency}
+            onCurrencyChange={changeCurrency}
             onChangePassword={() => setPasswordUpdateRequested(true)}
+            onSaveDisplayName={updateDisplayName}
             onManageInventoryCategories={openManageCategories}
             onManageFinanceCategories={openManageFinanceCategories}
             onSignOut={() => void signOut()}
@@ -350,24 +429,33 @@ export default function App() {
       />
       <ItemFormDialog
         open={formOpen}
-        barcode={scannedBarcode}
         item={editingItem}
         categories={categories}
         onClose={() => setFormOpen(false)}
-        onClearBarcode={() => setScannedBarcode("")}
         onManageCategories={openManageCategories}
         onSubmit={async (draft, current) => {
-          await saveDraft(draft, current);
+          const saved = await saveDraft(draft, current);
+          notifySuccess(current ? "Item updated" : "Item added", saved.name);
         }}
       />
       <TransactionFormDialog
         open={transactionFormOpen}
         transaction={editingTransaction}
         categories={finance.categories}
-        onClose={() => setTransactionFormOpen(false)}
+        operationalFunds={operationalFunds}
+        initialOperationalFundId={initialOperationalFundId}
+        onClose={() => {
+          setTransactionFormOpen(false);
+          setInitialOperationalFundId("");
+        }}
         onManageCategories={openManageFinanceCategories}
         onSubmit={async (draft, current) => {
-          await finance.saveTransaction(draft, current);
+          const saved = await finance.saveTransaction(draft, current);
+          setInitialOperationalFundId("");
+          notifySuccess(
+            current ? "Transaction updated" : "Transaction added",
+            `${saved.kind === "income" ? "Income" : "Expense"} · ${saved.category}`,
+          );
         }}
       />
       <CategoryManagerDialog
@@ -375,18 +463,42 @@ export default function App() {
         categories={categories}
         error={categoriesError}
         onClose={() => setCategoryManagerOpen(false)}
-        onCreate={addCategory}
-        onUpdate={editCategory}
-        onDelete={removeCategory}
+        onCreate={async (draft) => {
+          const created = await addCategory(draft);
+          notifySuccess("Inventory category added", created.name);
+          return created;
+        }}
+        onUpdate={async (id, draft) => {
+          const updated = await editCategory(id, draft);
+          notifySuccess("Inventory category updated", updated.name);
+          return updated;
+        }}
+        onDelete={async (id) => {
+          const deleted = categories.find((entry) => entry.id === id);
+          await removeCategory(id);
+          notifySuccess("Inventory category deleted", deleted?.name);
+        }}
       />
       <FinanceCategoryManagerDialog
         open={financeCategoryManagerOpen}
         categories={finance.categories}
         error={finance.error}
         onClose={() => setFinanceCategoryManagerOpen(false)}
-        onCreate={finance.addCategory}
-        onUpdate={finance.editCategory}
-        onDelete={finance.removeCategory}
+        onCreate={async (draft) => {
+          const created = await finance.addCategory(draft);
+          notifySuccess("Finance category added", created.name);
+          return created;
+        }}
+        onUpdate={async (id, draft) => {
+          const updated = await finance.editCategory(id, draft);
+          notifySuccess("Finance category updated", updated.name);
+          return updated;
+        }}
+        onDelete={async (id) => {
+          const deleted = finance.categories.find((entry) => entry.id === id);
+          await finance.removeCategory(id);
+          notifySuccess("Finance category deleted", deleted?.name);
+        }}
       />
       <ConfirmDialog
         open={Boolean(pendingTransactionDelete)}
@@ -403,11 +515,7 @@ export default function App() {
         onCancel={() => !isDeletingTransaction && setPendingTransactionDelete(undefined)}
         onConfirm={() => void confirmTransactionDelete()}
       />
-      <Suspense fallback={null}>
-        {scannerOpen ? (
-          <ScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
-        ) : null}
-      </Suspense>
+      <ToastNotification message={toast} onDismiss={() => setToast(null)} />
       <BottomNav view={view} onChangeView={setView} onAdd={handlePrimaryAdd} />
       </div>
     </AuthGate>

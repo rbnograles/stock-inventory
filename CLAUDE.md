@@ -12,26 +12,24 @@ expiry dates.
 - Styling: Tailwind CSS + Material Tailwind + lucide-react icons
 - Auth: Supabase Auth email/password
 - Storage: Supabase `inventory_items` table with RLS
-- Scanner: `@zxing/browser`, lazy-loaded through `ScannerDialog`
 - PWA: `public/manifest.webmanifest`, `public/sw.js`, SVG app icons
 
 ## Core Workflows
 
-- `src/App.tsx` orchestrates inventory state, filtering, dialogs, and scan flow.
+- `src/App.tsx` orchestrates inventory state, filtering, dialogs, and finance flow.
 - `src/hooks/useAuth.ts` owns Supabase session state.
 - `src/hooks/useInventory.ts` loads and mutates authenticated inventory state.
 - `src/lib/inventoryStore.ts` owns Supabase persistence.
 - `src/lib/supabaseClient.ts` owns client configuration.
 - `src/lib/expiry.ts` owns expiry calculations and sorting.
 - `src/components/ItemFormDialog.tsx` handles add/edit item forms.
-- `src/components/ScannerDialog.tsx` handles barcode scanning and manual fallback.
 
 ## Decisions Already Made
 
 - Supabase Auth gates the dashboard. No inventory loads until a user signs in.
 - Supabase is the source of truth for inventory data.
 - The app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env`.
-- Scanner is lazy-loaded to keep initial mobile startup lighter.
+- Barcode scanning has been removed; barcode is manual item metadata only.
 - React and ReactDOM are forced to a single version through `package.json`
   overrides and Vite `resolve.dedupe` to avoid duplicate React hook errors from
   nested dependencies.

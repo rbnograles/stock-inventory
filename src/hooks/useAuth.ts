@@ -111,6 +111,21 @@ export const useAuth = () => {
     }
   }, []);
 
+  const updateDisplayName = useCallback(async (displayName: string) => {
+    const trimmed = displayName.trim();
+    const { data, error: updateError } = await supabase.auth.updateUser({
+      data: { display_name: trimmed || null },
+    });
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    if (data.user) {
+      setUser(data.user);
+    }
+  }, []);
+
   return {
     session,
     user,
@@ -121,5 +136,6 @@ export const useAuth = () => {
     clearError,
     clearPasswordRecovery,
     signOut,
+    updateDisplayName,
   };
 };

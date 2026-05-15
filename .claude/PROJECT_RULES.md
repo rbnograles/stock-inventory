@@ -7,7 +7,7 @@
 - Supabase Auth and Supabase tables are now the source of truth.
 - Use Material Tailwind primitives for common controls.
 - Use Tailwind for layout and responsive styling.
-- Keep scanner and camera experiences graceful when permissions fail.
+- Keep camera/photo capture graceful when permissions fail.
 - Add JSDoc-style file headers to new files and meaningful edits.
 - Keep React components under 200 lines.
 - Use `@/` alias imports.
@@ -27,7 +27,7 @@
 - Keep bottom actions thumb-friendly.
 - Keep text readable on 390px-wide mobile screens.
 - Provide dark mode classes for new UI.
-- Use icons for obvious actions such as add, scan, edit, delete, refresh, and
+- Use icons for obvious actions such as add, edit, delete, refresh, and
   dark-mode toggle.
 - Avoid custom modal/backdrop implementations when Material Tailwind `Dialog`
   can handle the job.

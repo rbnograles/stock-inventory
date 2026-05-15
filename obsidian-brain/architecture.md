@@ -23,7 +23,7 @@ presents stock status by category and expiry risk.
 4. `inventoryStore` maps Supabase rows to UI-friendly inventory items.
 5. `App` filters and groups items for dashboard display.
 6. `ItemFormDialog` creates or updates drafts.
-7. `ScannerDialog` returns a barcode into the add/edit flow.
+7. Barcode stays as manual metadata in `ItemFormDialog`.
 8. Expiry labels and priority sorting come from `expiry.ts`.
 
 ## Current Storage Shape

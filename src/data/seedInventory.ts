@@ -1,7 +1,7 @@
 /**
  * Provides a small starter dataset for a brand-new installation. The seed data
  * makes the first launch useful immediately and demonstrates expiry states
- * without requiring Ryan to scan or add products before seeing the dashboard.
+ * without requiring Ryan to add products before seeing the dashboard.
  */
 import type { InventoryItem } from "@/types/inventory";
 

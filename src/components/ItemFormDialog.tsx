@@ -1,8 +1,7 @@
 /**
  * Handles create and edit flows in one mobile-first sheet-style dialog. The
  * form keeps all fields local until submit, which makes edits reversible and
- * lets scanned barcode/photo data flow into the draft without touching
- * IndexedDB early.
+ * keeps barcode/photo data local until Supabase persistence succeeds.
  */
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Barcode, Calendar, ChevronDown, MapPin, Package, Pencil, Sparkles, Tag, X } from "lucide-react";
@@ -12,20 +11,15 @@ import type { Category } from "@/types/category";
 
 interface ItemFormDialogProps {
   open: boolean;
-  barcode: string;
   item?: InventoryItem;
   categories: Category[];
   onClose: () => void;
-  onClearBarcode: () => void;
   onManageCategories?: () => void;
   onSubmit: (draft: InventoryDraft, item?: InventoryItem) => Promise<void>;
 }
 
 const itemToDraft = (item?: InventoryItem): InventoryDraft => {
-  if (!item) {
-    return EMPTY_DRAFT;
-  }
-
+  if (!item) return EMPTY_DRAFT;
   return {
     name: item.name,
     category: item.category,
@@ -38,11 +32,6 @@ const itemToDraft = (item?: InventoryItem): InventoryDraft => {
     photoDataUrl: item.photoDataUrl ?? "",
   };
 };
-
-const fieldLabel =
-  "block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400";
-const fieldShell =
-  "w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
 
 const Field = ({
   label,
@@ -58,38 +47,39 @@ const Field = ({
   hint?: ReactNode;
 }) => (
   <div className="space-y-1.5">
-    <label htmlFor={htmlFor} className={fieldLabel}>
+    <label htmlFor={htmlFor} className="hs-field-label">
       {label}
       {required ? <span className="ml-1 text-rose-500">*</span> : null}
     </label>
     {children}
-    {hint ? <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
+    {hint ? <p className="text-xs hs-text-muted">{hint}</p> : null}
   </div>
 );
 
 const InputWithIcon = ({
   id,
   icon,
+  className = "",
+  wrapperClassName = "",
   ...props
 }: {
   id: string;
   icon: ReactNode;
+  wrapperClassName?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>) => (
-  <div className="relative">
+  <div className={`relative ${wrapperClassName}`}>
     <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
       {icon}
     </span>
-    <input id={id} {...props} className={`${fieldShell} h-12 pl-10`} />
+    <input id={id} {...props} className={`hs-input h-12 pl-10 ${className}`} />
   </div>
 );
 
 export const ItemFormDialog = ({
   open,
-  barcode,
   item,
   categories,
   onClose,
-  onClearBarcode,
   onManageCategories,
   onSubmit,
 }: ItemFormDialogProps) => {
@@ -107,26 +97,19 @@ export const ItemFormDialog = ({
       setDraft({
         ...initial,
         category: initial.category || defaultCategory,
-        barcode: item?.barcode ?? barcode,
+        barcode: item?.barcode ?? "",
       });
       setError("");
     }
-  }, [barcode, defaultCategory, item, open]);
+  }, [defaultCategory, item, open]);
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-
+    if (!open) return undefined;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onClose();
     };
-
     window.addEventListener("keydown", handleKey);
     return () => {
       document.body.style.overflow = previous;
@@ -142,18 +125,14 @@ export const ItemFormDialog = ({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     if (!isValid) {
       setError("Item name and quantity are required.");
       return;
     }
-
     setIsSaving(true);
     setError("");
-
     try {
       await onSubmit(draft, item);
-      onClearBarcode();
       onClose();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save item.");
@@ -162,48 +141,28 @@ export const ItemFormDialog = ({
     }
   };
 
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
-    >
-      <button
-        type="button"
-        aria-label="Close dialog"
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <form
-        onSubmit={handleSubmit}
-        className="relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-soft animate-pop-in sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900"
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+    <div role="dialog" aria-modal="true" aria-label={title} className="hs-modal-overlay">
+      <button type="button" aria-label="Close dialog" className="hs-modal-backdrop" onClick={onClose} />
+      <form onSubmit={handleSubmit} className="hs-modal-shell">
+        <header className="hs-modal-header">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-soft">
+            <span className="hs-icon-badge bg-gradient-to-br from-teal-500 to-cyan-500">
               {editing ? <Pencil className="h-5 w-5" aria-hidden="true" /> : <Sparkles className="h-5 w-5" aria-hidden="true" />}
             </span>
             <div className="leading-tight">
-              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">{title}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+              <h2 className="text-lg font-extrabold hs-text-primary">{title}</h2>
+              <p className="text-xs hs-text-muted">{subtitle}</p>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
+          <button type="button" aria-label="Close" onClick={onClose} className="hs-btn-icon">
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <div className="hs-modal-body">
           <Field label="Product name" htmlFor="field-name" required>
             <InputWithIcon
               id="field-name"
@@ -228,7 +187,8 @@ export const ItemFormDialog = ({
                 onChange={(event: ChangeEvent<HTMLInputElement>) =>
                   updateDraft("quantity", Number(event.target.value))
                 }
-                className={`${fieldShell} h-12`}
+                onFocus={(event) => event.target.select()}
+                className="hs-input h-12"
                 required
               />
             </Field>
@@ -239,7 +199,7 @@ export const ItemFormDialog = ({
                 placeholder="pcs"
                 value={draft.unit}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraft("unit", event.target.value)}
-                className={`${fieldShell} h-12 text-center`}
+                className="hs-input h-12 text-center"
               />
             </Field>
           </div>
@@ -267,11 +227,9 @@ export const ItemFormDialog = ({
                 id="field-category"
                 value={draft.category}
                 onChange={(event) => updateDraft("category", event.target.value)}
-                className={`${fieldShell} h-12 appearance-none pl-10 pr-10`}
+                className="hs-input h-12 appearance-none pl-10 pr-10"
               >
-                {categories.length === 0 ? (
-                  <option value="">No categories yet</option>
-                ) : null}
+                {categories.length === 0 ? <option value="">No categories yet</option> : null}
                 {categories.map((category) => (
                   <option key={category.id} value={category.name}>
                     {category.emoji} {category.name}
@@ -294,7 +252,7 @@ export const ItemFormDialog = ({
                 id="field-barcode"
                 icon={<Barcode className="h-4 w-4" />}
                 type="text"
-                placeholder="Scan or type"
+                placeholder="Type barcode"
                 value={draft.barcode}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraft("barcode", event.target.value)}
               />
@@ -318,6 +276,8 @@ export const ItemFormDialog = ({
               type="date"
               value={draft.expiryDate}
               onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraft("expiryDate", event.target.value)}
+              className="hs-date-input"
+              wrapperClassName="hs-date-input-wrap"
             />
           </Field>
 
@@ -328,7 +288,7 @@ export const ItemFormDialog = ({
               placeholder="Brand, recipe ideas, allergens…"
               value={draft.notes}
               onChange={(event: ChangeEvent<HTMLTextAreaElement>) => updateDraft("notes", event.target.value)}
-              className={`${fieldShell} resize-none py-3`}
+              className="hs-input resize-none py-3"
             />
           </Field>
 
@@ -341,20 +301,11 @@ export const ItemFormDialog = ({
           ) : null}
         </div>
 
-        <footer className="safe-pb flex items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 pt-3 dark:border-slate-800 dark:bg-slate-900">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="h-11 rounded-full px-5 text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
+        <footer className="hs-modal-footer">
+          <button type="button" onClick={onClose} disabled={isSaving} className="hs-btn-ghost h-11 px-5 disabled:opacity-50">
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={!isValid || isSaving}
-            className="h-11 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 px-6 text-sm font-bold text-white shadow-soft transition active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-          >
+          <button type="submit" disabled={!isValid || isSaving} className="hs-btn-primary h-11 px-6">
             {isSaving ? "Saving…" : editing ? "Save changes" : "Add item"}
           </button>
         </footer>

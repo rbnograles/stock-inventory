@@ -33,16 +33,13 @@ export const CameraField = ({ value, onChange }: CameraFieldProps) => {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label
-          className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
-          htmlFor="item-photo"
-        >
+        <label className="hs-field-label" htmlFor="item-photo">
           Item photo
         </label>
         {value ? (
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
             onClick={() => onChange("")}
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -64,12 +61,12 @@ export const CameraField = ({ value, onChange }: CameraFieldProps) => {
             </span>
           </>
         ) : (
-          <div className="flex h-56 flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 group-hover:bg-teal-500 group-hover:text-white group-hover:ring-teal-400 dark:bg-slate-900 dark:ring-slate-700 dark:group-hover:bg-teal-500 dark:group-hover:ring-teal-400">
+          <div className="flex h-56 flex-col items-center justify-center gap-2 hs-text-muted">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition group-hover:bg-teal-500 group-hover:text-white group-hover:ring-teal-400 dark:bg-slate-900 dark:ring-slate-700 dark:group-hover:bg-teal-500 dark:group-hover:ring-teal-400">
               <ImagePlus className="h-6 w-6" aria-hidden="true" />
             </span>
-            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Add a photo</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Tap to capture or upload</p>
+            <p className="text-sm font-bold hs-text-secondary">Add a photo</p>
+            <p className="text-xs hs-text-muted">Tap to capture or upload</p>
           </div>
         )}
         <input

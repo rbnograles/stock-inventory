@@ -3,7 +3,8 @@
  * action behind a confirm dialog at the dashboard level.
  */
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, WalletCards } from "lucide-react";
+import { isOperationalDrawdown } from "@/lib/financeOperational";
 import { formatMoney } from "@/lib/money";
 import type { FinanceCategory, Transaction } from "@/types/finance";
 
@@ -41,10 +42,17 @@ export const TransactionRow = ({ transaction, categories, onEdit, onDelete }: Tr
   const emoji = category?.emoji ?? (transaction.kind === "income" ? "💰" : "💸");
 
   const isIncome = transaction.kind === "income";
-  const amountClass = isIncome ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
+  const operationalDrawdown = isOperationalDrawdown(transaction);
+  const amountClass = isIncome
+    ? "text-emerald-600 dark:text-emerald-300"
+    : operationalDrawdown
+      ? "text-amber-600 dark:text-amber-300"
+      : "text-rose-600 dark:text-rose-300";
   const avatarBg = isIncome
     ? "bg-emerald-100 dark:bg-emerald-500/15"
-    : "bg-rose-100 dark:bg-rose-500/15";
+    : operationalDrawdown || transaction.isOperationalFund
+      ? "bg-amber-100 dark:bg-amber-500/15"
+      : "bg-rose-100 dark:bg-rose-500/15";
 
   return (
     <article className={`flex items-center gap-3 px-3 py-2.5 ${menuOpen ? "relative z-20" : ""}`}>
@@ -64,6 +72,12 @@ export const TransactionRow = ({ transaction, categories, onEdit, onDelete }: Tr
             {formatDate(transaction.occurredOn)}
             {transaction.description ? ` · ${transaction.description}` : ""}
           </p>
+          {transaction.isOperationalFund || operationalDrawdown ? (
+            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+              <WalletCards className="h-3 w-3" aria-hidden="true" />
+              {transaction.isOperationalFund ? "Operational fund" : "Operational spend"}
+            </p>
+          ) : null}
         </div>
       </button>
 

@@ -14,12 +14,12 @@ interface BottomNavProps {
 }
 
 export const BottomNav = ({ view, onChangeView, onAdd }: BottomNavProps) => {
-  const addLabel = view === "finance" ? "Add money" : "Add item";
+  const addLabel = view === "finance" ? "Add transaction" : "Add item";
 
   return (
     <nav
       aria-label="Primary navigation"
-      className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/90 px-3 pt-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90"
+      className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/85 px-3 pt-2 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:border-slate-800/80 dark:bg-slate-950/85 dark:supports-[backdrop-filter]:bg-slate-950/70"
     >
       <div className="relative mx-auto grid max-w-lg grid-cols-[1fr_1fr_72px_1fr_1fr] items-end gap-1">
         <TabButton
@@ -80,13 +80,13 @@ const TabButton = ({
     type="button"
     aria-pressed={active}
     onClick={onClick}
-    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-2xl transition active:scale-[0.98] ${
-      active ? "text-teal-600 dark:text-teal-300" : "text-slate-500 dark:text-slate-400"
+    className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl transition active:scale-[0.96] ${
+      active ? "text-teal-600 dark:text-teal-300" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
     }`}
   >
     <span
-      className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
-        active ? "bg-teal-100 dark:bg-teal-500/20" : ""
+      className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 ${
+        active ? "bg-teal-100 scale-110 dark:bg-teal-500/20" : "scale-100"
       }`}
     >
       {icon}

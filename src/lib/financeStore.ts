@@ -4,6 +4,7 @@
  * the camelCase domain shapes the UI prefers.
  */
 import { supabase } from "@/lib/supabaseClient";
+import { defaultOperationalPeriodEnd } from "@/lib/financeOperational";
 import type {
   FinanceCategory,
   FinanceCategoryDraft,
@@ -32,11 +33,34 @@ interface TransactionRow {
   category: string;
   description: string | null;
   occurred_on: string;
+  is_operational_fund?: boolean | null;
+  operational_fund_id?: string | null;
+  operational_period_start?: string | null;
+  operational_period_end?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const cleanNullable = (value: string | undefined) => value?.trim() || null;
+
+const OPERATIONAL_MIGRATION_MESSAGE =
+  "Operational expenses need the latest Supabase migration. Apply 20260515163000_add_operational_expenses.sql, then try again.";
+
+const isMissingOperationalColumnError = (message: string) =>
+  [
+    "is_operational_fund",
+    "operational_fund_id",
+    "operational_period_start",
+    "operational_period_end",
+  ].some((column) => message.includes(column));
+
+const getSaveErrorMessage = (error: { message: string }, needsOperationalColumns: boolean) => {
+  if (needsOperationalColumns && isMissingOperationalColumnError(error.message)) {
+    return OPERATIONAL_MIGRATION_MESSAGE;
+  }
+
+  return error.message;
+};
 
 const mapCategoryRow = (row: CategoryRow): FinanceCategory => ({
   id: row.id,
@@ -57,6 +81,10 @@ const mapTransactionRow = (row: TransactionRow): Transaction => ({
   category: row.category,
   description: row.description ?? undefined,
   occurredOn: row.occurred_on,
+  isOperationalFund: Boolean(row.is_operational_fund),
+  operationalFundId: row.operational_fund_id ?? undefined,
+  operationalPeriodStart: row.operational_period_start ?? undefined,
+  operationalPeriodEnd: row.operational_period_end ?? undefined,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -110,6 +138,26 @@ export const updateFinanceCategory = async (id: string, draft: FinanceCategoryDr
   return mapCategoryRow(data as CategoryRow);
 };
 
+export const renameFinanceTransactionsCategory = async (
+  userId: string,
+  kind: TransactionKind,
+  previousName: string,
+  nextName: string,
+) => {
+  if (previousName.trim() === nextName.trim()) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("finance_transactions")
+    .update({ category: nextName.trim() })
+    .eq("user_id", userId)
+    .eq("kind", kind)
+    .eq("category", previousName.trim());
+
+  if (error) throw new Error(error.message);
+};
+
 export const deleteFinanceCategory = async (id: string) => {
   const { error } = await supabase.from("finance_categories").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -145,13 +193,32 @@ export const saveTransactionDraft = async (
   userId: string,
   current?: Transaction,
 ) => {
-  const payload = {
+  const isExpense = draft.kind === "expense";
+  const isOperationalFund = isExpense && draft.isOperationalFund;
+  const periodStart = draft.operationalPeriodStart || draft.occurredOn;
+  const basePayload = {
     kind: draft.kind,
     amount: Math.max(0, Number(draft.amount) || 0),
     category: draft.category.trim() || "Other",
     description: cleanNullable(draft.description),
     occurred_on: draft.occurredOn,
   };
+  const needsOperationalColumns =
+    isOperationalFund || Boolean(draft.operationalFundId) || Boolean(current?.isOperationalFund);
+  const payload = needsOperationalColumns
+    ? {
+        ...basePayload,
+        is_operational_fund: isOperationalFund,
+        operational_fund_id:
+          isExpense && !isOperationalFund && draft.operationalFundId
+            ? draft.operationalFundId
+            : null,
+        operational_period_start: isOperationalFund ? periodStart : null,
+        operational_period_end: isOperationalFund
+          ? draft.operationalPeriodEnd || defaultOperationalPeriodEnd(periodStart)
+          : null,
+      }
+    : basePayload;
 
   if (current) {
     const { data, error } = await supabase
@@ -161,7 +228,10 @@ export const saveTransactionDraft = async (
       .select("*")
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(getSaveErrorMessage(error, needsOperationalColumns));
+    if (current.isOperationalFund && !isOperationalFund) {
+      await clearOperationalFundAssignments(current.id);
+    }
     return mapTransactionRow(data as TransactionRow);
   }
 
@@ -171,8 +241,17 @@ export const saveTransactionDraft = async (
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(getSaveErrorMessage(error, needsOperationalColumns));
   return mapTransactionRow(data as TransactionRow);
+};
+
+const clearOperationalFundAssignments = async (fundId: string) => {
+  const { error } = await supabase
+    .from("finance_transactions")
+    .update({ operational_fund_id: null })
+    .eq("operational_fund_id", fundId);
+
+  if (error) throw new Error(error.message);
 };
 
 export const deleteTransaction = async (id: string) => {

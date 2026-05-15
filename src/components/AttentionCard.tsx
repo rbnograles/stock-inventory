@@ -31,30 +31,38 @@ export const AttentionCard = ({
       gradient: "from-rose-500 to-pink-500",
       icon: TriangleAlert,
       label: "Needs attention",
-      value: attention,
+      value: String(attention),
+      valueSuffix: attention === 1 ? "item" : "items",
       subtitle:
         expired > 0 && soon > 0
           ? `${expired} expired · ${soon} expiring soon`
           : expired > 0
-            ? `${expired} item${expired === 1 ? "" : "s"} expired`
+            ? `${expired} expired`
             : `${soon} expiring soon`,
-      cta: attentionActive ? "Showing only attention items" : "Tap to review",
+      cta: attentionActive ? "Showing only attention" : "Tap to review",
+      showTrailing: true,
     },
     amber: {
       gradient: "from-amber-500 to-orange-500",
       icon: Sparkles,
       label: "Use up soon",
-      value: soon,
-      subtitle: `${soon} item${soon === 1 ? "" : "s"} expiring within 14 days`,
-      cta: attentionActive ? "Showing only attention items" : "Tap to review",
+      value: String(soon),
+      valueSuffix: soon === 1 ? "item" : "items",
+      subtitle: `Expiring within 14 days`,
+      cta: attentionActive ? "Showing only attention" : "Tap to review",
+      showTrailing: true,
     },
     teal: {
       gradient: "from-teal-500 to-cyan-500",
       icon: PartyPopper,
-      label: "Fresh & stocked",
-      value: items.length,
-      subtitle: `${totalUnits} unit${totalUnits === 1 ? "" : "s"} on hand · all looking good`,
+      label: "All caught up",
+      value: "Nothing expiring",
+      valueSuffix: "",
+      subtitle: items.length === 0
+        ? "Add your first item to get started"
+        : `${items.length} item${items.length === 1 ? "" : "s"} · ${totalUnits} unit${totalUnits === 1 ? "" : "s"} on hand`,
       cta: "Keep up the streak",
+      showTrailing: false,
     },
   }[tone];
 
@@ -78,8 +86,13 @@ export const AttentionCard = ({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90">
             {palette.label}
           </p>
-          <p className="text-3xl font-extrabold leading-none text-white">{palette.value}</p>
-          <p className="mt-1 truncate text-sm font-medium text-white/90">{palette.subtitle}</p>
+          <p className="flex items-baseline gap-1.5 text-2xl font-extrabold leading-tight text-white">
+            <span>{palette.value}</span>
+            {palette.valueSuffix ? (
+              <span className="text-sm font-semibold text-white/85">{palette.valueSuffix}</span>
+            ) : null}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-medium text-white/90">{palette.subtitle}</p>
         </div>
         {isInteractive ? (
           <ChevronRight
@@ -91,9 +104,11 @@ export const AttentionCard = ({
 
       <div className="relative mt-4 flex items-center justify-between text-xs font-semibold text-white/90">
         <span>{palette.cta}</span>
-        <span className="rounded-full bg-white/20 px-3 py-1 backdrop-blur">
-          {items.length} tracked
-        </span>
+        {palette.showTrailing ? (
+          <span className="rounded-full bg-white/20 px-3 py-1 backdrop-blur">
+            {items.length} total
+          </span>
+        ) : null}
       </div>
     </div>
   );

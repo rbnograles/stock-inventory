@@ -11,7 +11,7 @@
 - Added search and category filters.
 - Added add/edit/delete item flow.
 - Added photo capture through mobile camera/file input.
-- Added QR/barcode scanning with manual fallback.
+- Removed barcode scanning; barcode remains manual item metadata only.
 - Added dark mode toggle.
 - Added build and audit verification.
 - Added Supabase Auth login/sign-up.
@@ -24,12 +24,10 @@
 2. Add `.env` with Supabase URL and anon key.
 3. Add low-stock threshold and shopping list view.
 4. Add Supabase Storage for photos instead of table data URLs.
-5. Add deployment over HTTPS for real-phone barcode scanning.
+5. Add deployment over HTTPS for realistic mobile testing.
 
 ## Risks To Watch
 
-- Camera scanning on phones requires HTTPS.
-- Scanner dependency is heavy; keep it lazy-loaded.
 - Material Tailwind type definitions may require the local adapter until the
   package improves its React typings.
 - Service worker cache strategy is intentionally simple and should be revisited

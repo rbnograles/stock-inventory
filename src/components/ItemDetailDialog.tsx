@@ -29,15 +29,13 @@ const MetaRow = ({
   label: string;
   value: string;
 }) => (
-  <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-3.5 py-3 dark:bg-slate-800/60">
+  <div className="flex items-start gap-3 hs-tile-muted px-3.5 py-3">
     <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
       {icon}
     </span>
     <div className="min-w-0 flex-1">
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-        {label}
-      </p>
-      <p className="break-words text-sm font-semibold text-slate-900 dark:text-white">{value}</p>
+      <p className="hs-eyebrow-tight">{label}</p>
+      <p className="break-words text-sm font-semibold hs-text-primary">{value}</p>
     </div>
   </div>
 );
@@ -74,19 +72,9 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
   const categoryEmoji = emojiForCategory(item.category, categories);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={item.name}
-      className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
-    >
-      <button
-        type="button"
-        aria-label="Close preview"
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-soft animate-pop-in sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
+    <div role="dialog" aria-modal="true" aria-label={item.name} className="hs-modal-overlay">
+      <button type="button" aria-label="Close preview" className="hs-modal-backdrop" onClick={onClose} />
+      <div className="hs-modal-shell">
         <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${tone.heroGradient}`}>
           {item.photoDataUrl ? (
             <img
@@ -106,13 +94,13 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/50 text-white backdrop-blur transition hover:bg-slate-950/70"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/60 text-white backdrop-blur transition hover:bg-slate-950/80"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
 
           <div className="absolute left-3 top-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-xs font-bold text-slate-800 shadow-sm backdrop-blur dark:bg-slate-950/70 dark:text-white">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-slate-800 shadow-sm backdrop-blur dark:bg-slate-950/80 dark:text-white">
               <span aria-hidden="true">{categoryEmoji}</span>
               {item.category}
             </span>
@@ -121,14 +109,10 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
 
         <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4">
           <div className="space-y-1">
-            <h2 className="text-2xl font-extrabold leading-tight text-slate-900 dark:text-white">
-              {item.name}
-            </h2>
+            <h2 className="text-2xl font-extrabold leading-tight hs-text-primary">{item.name}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={status} />
-              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {expiryLabel}
-              </span>
+              <span className="text-sm font-semibold hs-text-secondary">{expiryLabel}</span>
             </div>
           </div>
 
@@ -160,32 +144,26 @@ export const ItemDetailDialog = ({ open, item, categories, onClose, onEdit, onDe
           </div>
 
           {item.notes ? (
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
-              <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="mt-3 hs-tile-muted px-4 py-3">
+              <p className="flex items-center gap-2 hs-eyebrow-tight">
                 <NotebookPen className="h-3.5 w-3.5" aria-hidden="true" />
                 Notes
               </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm font-medium text-slate-700 dark:text-slate-200">
-                {item.notes}
-              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm font-medium hs-text-secondary">{item.notes}</p>
             </div>
           ) : null}
         </div>
 
-        <footer className="safe-pb flex items-center gap-2 border-t border-slate-100 bg-white px-5 pt-3 dark:border-slate-800 dark:bg-slate-900">
+        <footer className="hs-modal-footer">
           <button
             type="button"
             onClick={() => onDelete(item)}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 text-sm font-bold text-rose-700 transition active:scale-[0.98] hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/60"
+            className="hs-btn h-11 flex-1 border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/60"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
             Delete
           </button>
-          <button
-            type="button"
-            onClick={() => onEdit(item)}
-            className="flex h-11 flex-[2] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-sm font-bold text-white shadow-soft transition active:scale-[0.98] hover:brightness-110"
-          >
+          <button type="button" onClick={() => onEdit(item)} className="hs-btn-primary h-11 flex-[2]">
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Edit item
           </button>

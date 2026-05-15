@@ -45,7 +45,7 @@ If a file is missing, note it briefly and continue.
   client config; service-role keys are secrets and must never be exposed.
 - Do not move server-only logic into `src/` if backend code is added later.
 - Supabase Auth and `inventory_items` are now the source of truth.
-- Keep camera and barcode features graceful on browsers that deny device access.
+- Keep camera/photo features graceful on browsers that deny device access.
 
 ## Verification Rules
 
@@ -57,8 +57,8 @@ Run the relevant checks before calling work done:
 
 Known acceptable warning:
 
-- Vite may warn that some chunks exceed 500 kB because Material Tailwind and the
-  scanner dependency are substantial. Keep `ScannerDialog` lazy-loaded.
+- Vite may warn that some chunks exceed 500 kB because Material Tailwind and
+  analytics dependencies are substantial.
 
 ## Current Product Scope
 
@@ -68,7 +68,6 @@ The first working version includes:
 - Search and category filters
 - Add, edit, and delete item flows
 - Camera photo capture through mobile file input
-- QR/barcode scanner through ZXing
 - Supabase Auth login/sign-up
 - Supabase `inventory_items` storage with row-level security
 - Expiry status: expired, soon, healthy, unknown
@@ -77,7 +76,6 @@ The first working version includes:
 
 ## Important Mobile Notes
 
-Barcode scanning needs a secure browser context on real phones. Desktop
-localhost is fine, but LAN HTTP may block camera access. Deployment over HTTPS,
-for example Vercel, is the clean path for phone testing. Supabase requires
+Deployment over HTTPS, for example Vercel, is the clean path for real phone
+testing. Supabase requires
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env`.

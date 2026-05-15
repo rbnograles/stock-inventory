@@ -7,6 +7,7 @@ import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "
 import { Check, Pencil, Plus, Sparkles, Tag, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toneForCategory } from "@/lib/categoryVisuals";
+import { normalizeEmojiInput } from "@/lib/emoji";
 import type { Category, CategoryDraft } from "@/types/category";
 
 interface CategoryManagerDialogProps {
@@ -20,15 +21,15 @@ interface CategoryManagerDialogProps {
 }
 
 const EMOJI_PICKS = [
-  "🥫", "🥬", "🧊", "💊", "🧼", "🧴", "📦",
-  "🍞", "🥛", "🥚", "🧀", "🍎", "🥕", "🍗",
-  "🍝", "🍜", "🍫", "🍪", "☕", "🍷", "🧂",
-  "🌶️", "🧴", "🧻", "🪥", "🚿", "🧽", "🪣",
-  "💉", "🩹", "👶", "🐶", "🐱", "🌿", "🪴",
+  "🥫", "🥬", "🧊", "💊", "🧼", "🧴", "📦", "🏷️",
+  "🍞", "🥛", "🥚", "🧀", "🍎", "🍌", "🍊", "🍓",
+  "🥕", "🥦", "🧅", "🧄", "🍗", "🥩", "🐟", "🍚",
+  "🍝", "🍜", "🥣", "🥪", "🥗", "🍫", "🍪", "🍿",
+  "☕", "🫖", "🧃", "🥤", "🍷", "🧂", "🌶️", "🍯",
+  "🧻", "🪥", "🪒", "🧽", "🪣", "🧹", "🧺", "🧯",
+  "💉", "🩹", "🌡️", "🧪", "👶", "🍼", "🐶", "🐱",
+  "🌿", "🪴", "🔋", "💡", "🧰", "🧵", "📚", "🎒",
 ];
-
-const fieldShell =
-  "w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
 
 const emptyDraft: CategoryDraft = { name: "", emoji: "📦" };
 
@@ -144,48 +145,29 @@ export const CategoryManagerDialog = ({
 
   return (
     <>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Manage categories"
-        className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
-      >
-        <button
-          type="button"
-          aria-label="Close manager"
-          className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-          onClick={onClose}
-        />
+      <div role="dialog" aria-modal="true" aria-label="Manage categories" className="hs-modal-overlay">
+        <button type="button" aria-label="Close manager" className="hs-modal-backdrop" onClick={onClose} />
 
-        <div className="relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-soft animate-pop-in sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
-          <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="hs-modal-shell">
+          <header className="hs-modal-header">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-soft">
+              <span className="hs-icon-badge bg-gradient-to-br from-teal-500 to-cyan-500">
                 <Tag className="h-5 w-5" aria-hidden="true" />
               </span>
               <div className="leading-tight">
-                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Manage categories
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Add, rename, or change emojis
-                </p>
+                <h2 className="text-lg font-extrabold hs-text-primary">Manage categories</h2>
+                <p className="text-xs hs-text-muted">Add, rename, or change emojis</p>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            >
+            <button type="button" aria-label="Close" onClick={onClose} className="hs-btn-icon">
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </header>
 
-          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          <div className="hs-modal-body">
             <form onSubmit={handleSubmit} className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
               <div className="flex items-center justify-between">
-                <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="flex items-center gap-2 hs-eyebrow">
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   {editingId ? `Editing ${editingCategory?.name ?? ""}` : "New category"}
                 </p>
@@ -202,21 +184,24 @@ export const CategoryManagerDialog = ({
 
               <div className="grid grid-cols-[72px_1fr] gap-3">
                 <label className="space-y-1.5">
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  <span className="hs-field-label">
                     Emoji
                   </span>
                   <input
                     type="text"
                     value={draft.emoji}
+                    placeholder="🙂"
+                    autoComplete="off"
+                    inputMode="text"
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      setDraft((current) => ({ ...current, emoji: event.target.value.slice(0, 4) }))
+                      setDraft((current) => ({ ...current, emoji: normalizeEmojiInput(event.target.value) }))
                     }
-                    className={`${fieldShell} h-12 text-center text-2xl`}
+                    className={`hs-input h-12 text-center text-2xl`}
                     aria-label="Category emoji"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  <span className="hs-field-label">
                     Name
                   </span>
                   <input
@@ -226,14 +211,14 @@ export const CategoryManagerDialog = ({
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
                       setDraft((current) => ({ ...current, name: event.target.value }))
                     }
-                    className={`${fieldShell} h-12`}
+                    className={`hs-input h-12`}
                     required
                   />
                 </label>
               </div>
 
               <div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="mb-2 hs-eyebrow">
                   Quick pick
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -243,6 +228,7 @@ export const CategoryManagerDialog = ({
                       <button
                         key={emoji}
                         type="button"
+                        aria-label={`Use ${emoji} emoji`}
                         onClick={() => setDraft((current) => ({ ...current, emoji }))}
                         className={`flex h-9 w-9 items-center justify-center rounded-xl text-xl transition active:scale-95 ${
                           active
@@ -267,7 +253,7 @@ export const CategoryManagerDialog = ({
                 <button
                   type="submit"
                   disabled={!isValid || isSubmitting}
-                  className="flex h-11 items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 px-5 text-sm font-bold text-white shadow-soft transition active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="hs-btn-primary h-11 px-5"
                 >
                   {editingId ? (
                     <>
@@ -285,7 +271,7 @@ export const CategoryManagerDialog = ({
             </form>
 
             <div className="space-y-2">
-              <p className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <p className="px-1 hs-eyebrow">
                 Your categories ({categories.length})
               </p>
               {categories.length === 0 ? (
@@ -293,7 +279,7 @@ export const CategoryManagerDialog = ({
                   No categories yet — add one above.
                 </p>
               ) : (
-                <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+                <ul className="hs-divider hs-tile overflow-hidden">
                   {categories.map((category) => {
                     const tone = toneForCategory(category.name);
                     const isEditing = editingId === category.id;
@@ -318,7 +304,7 @@ export const CategoryManagerDialog = ({
                           type="button"
                           onClick={() => startEdit(category)}
                           aria-label={`Edit ${category.name}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                          className="hs-btn-icon"
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -326,7 +312,7 @@ export const CategoryManagerDialog = ({
                           type="button"
                           onClick={() => setPendingDelete(category)}
                           aria-label={`Delete ${category.name}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-950/40"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -341,12 +327,8 @@ export const CategoryManagerDialog = ({
             </div>
           </div>
 
-          <footer className="safe-pb flex items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 pt-3 dark:border-slate-800 dark:bg-slate-900">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 rounded-full px-5 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
+          <footer className="hs-modal-footer">
+            <button type="button" onClick={onClose} className="hs-btn-ghost h-11 px-5">
               Done
             </button>
           </footer>

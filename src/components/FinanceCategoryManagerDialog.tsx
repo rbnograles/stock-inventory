@@ -2,9 +2,10 @@
  * Manager for finance categories. Same UX patterns as the inventory category
  * manager, but with an income/expense toggle and a kind-aware emoji palette.
  */
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Check, MinusCircle, Pencil, Plus, PlusCircle, Sparkles, Trash2, Wallet, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { normalizeEmojiInput } from "@/lib/emoji";
 import type {
   FinanceCategory,
   FinanceCategoryDraft,
@@ -21,11 +22,16 @@ interface FinanceCategoryManagerDialogProps {
   onDelete: (id: string) => Promise<void>;
 }
 
-const EMOJI_INCOME = ["💼", "🎁", "💸", "💰", "🏦", "📈", "🪙", "🤝", "↩️", "🧾"];
-const EMOJI_EXPENSE = ["🛒", "🏠", "⚡", "🚗", "🍽️", "🎬", "💊", "🛍️", "📦", "✈️", "📱", "🐶", "🪥", "👕", "🎓"];
-
-const fieldShell =
-  "w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+const EMOJI_INCOME = [
+  "💼", "🎁", "💸", "💰", "🏦", "📈", "🪙", "🤝", "↩️", "🧾",
+  "💳", "🏧", "🧑‍💻", "🛠️", "🏪", "🏡", "🚚", "🎨", "📚", "🏆",
+  "⭐", "🎯", "📦", "🪴", "💎", "🧧",
+];
+const EMOJI_EXPENSE = [
+  "🛒", "🏠", "⚡", "🚗", "⛽", "🍽️", "☕", "🎬", "💊", "🛍️",
+  "📦", "✈️", "🏨", "📱", "💻", "🐶", "🐱", "🪥", "👕", "🎓",
+  "🏋️", "🎮", "🧾", "💳", "🚌", "🚕", "🍼", "🎁", "🧰", "🧹",
+];
 
 const emptyDraft: FinanceCategoryDraft = { name: "", emoji: "💸", kind: "expense" };
 
@@ -44,6 +50,8 @@ export const FinanceCategoryManagerDialog = ({
   const [localError, setLocalError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<FinanceCategory | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -79,6 +87,11 @@ export const FinanceCategoryManagerDialog = ({
     setEditingId(category.id);
     setDraft({ name: category.name, emoji: category.emoji, kind: category.kind });
     setLocalError("");
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    });
   };
 
   const resetDraft = () => {
@@ -139,49 +152,37 @@ export const FinanceCategoryManagerDialog = ({
 
   return (
     <>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Manage finance categories"
-        className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
-      >
-        <button
-          type="button"
-          aria-label="Close manager"
-          className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-          onClick={onClose}
-        />
+      <div role="dialog" aria-modal="true" aria-label="Manage finance categories" className="hs-modal-overlay">
+        <button type="button" aria-label="Close manager" className="hs-modal-backdrop" onClick={onClose} />
 
-        <div className="relative flex max-h-[92svh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-soft animate-pop-in sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
-          <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="hs-modal-shell">
+          <header className="hs-modal-header">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-soft">
+              <span className="hs-icon-badge bg-gradient-to-br from-teal-500 to-emerald-500">
                 <Wallet className="h-5 w-5" aria-hidden="true" />
               </span>
               <div className="leading-tight">
-                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Finance categories</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Organize income and expense buckets
-                </p>
+                <h2 className="text-lg font-extrabold hs-text-primary">Finance categories</h2>
+                <p className="text-xs hs-text-muted">Organize income and expense buckets</p>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            >
+            <button type="button" aria-label="Close" onClick={onClose} className="hs-btn-icon">
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </header>
 
-          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          <div className="hs-modal-body">
             <form
+              ref={formRef}
               onSubmit={handleSubmit}
-              className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40"
+              className={`space-y-3 rounded-3xl border p-4 transition ${
+                editingId
+                  ? "border-teal-300 bg-teal-50/70 ring-4 ring-teal-500/10 dark:border-teal-700 dark:bg-teal-500/10"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40"
+              }`}
             >
               <div className="flex items-center justify-between">
-                <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="flex items-center gap-2 hs-eyebrow">
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   {editingId ? `Editing ${editingCategory?.name ?? ""}` : "New category"}
                 </p>
@@ -227,38 +228,42 @@ export const FinanceCategoryManagerDialog = ({
 
               <div className="grid grid-cols-[72px_1fr] gap-3">
                 <label className="space-y-1.5">
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  <span className="hs-field-label">
                     Emoji
                   </span>
                   <input
                     type="text"
                     value={draft.emoji}
+                    placeholder="🙂"
+                    autoComplete="off"
+                    inputMode="text"
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      setDraft((current) => ({ ...current, emoji: event.target.value.slice(0, 4) }))
+                      setDraft((current) => ({ ...current, emoji: normalizeEmojiInput(event.target.value) }))
                     }
-                    className={`${fieldShell} h-12 text-center text-2xl`}
+                    className={`hs-input h-12 text-center text-2xl`}
                     aria-label="Category emoji"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  <span className="hs-field-label">
                     Name
                   </span>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     value={draft.name}
                     placeholder={draft.kind === "income" ? "e.g. Freelance" : "e.g. Coffee"}
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
                       setDraft((current) => ({ ...current, name: event.target.value }))
                     }
-                    className={`${fieldShell} h-12`}
+                    className={`hs-input h-12`}
                     required
                   />
                 </label>
               </div>
 
               <div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="mb-2 hs-eyebrow">
                   Quick pick
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -268,6 +273,7 @@ export const FinanceCategoryManagerDialog = ({
                       <button
                         key={emoji}
                         type="button"
+                        aria-label={`Use ${emoji} emoji`}
                         onClick={() => setDraft((current) => ({ ...current, emoji }))}
                         className={`flex h-9 w-9 items-center justify-center rounded-xl text-xl transition active:scale-95 ${
                           active
@@ -292,7 +298,7 @@ export const FinanceCategoryManagerDialog = ({
                 <button
                   type="submit"
                   disabled={!isValid || isSubmitting}
-                  className="flex h-11 items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-5 text-sm font-bold text-white shadow-soft transition active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="hs-btn h-11 px-5 bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-soft hover:brightness-110"
                 >
                   {editingId ? (
                     <>
@@ -327,12 +333,8 @@ export const FinanceCategoryManagerDialog = ({
             />
           </div>
 
-          <footer className="safe-pb flex items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 pt-3 dark:border-slate-800 dark:bg-slate-900">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 rounded-full px-5 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
+          <footer className="hs-modal-footer">
+            <button type="button" onClick={onClose} className="hs-btn-ghost h-11 px-5">
               Done
             </button>
           </footer>
@@ -377,7 +379,7 @@ const CategoryGroup = ({
 
   return (
     <div className="space-y-2">
-      <p className="flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+      <p className="flex items-center gap-2 px-1 hs-eyebrow">
         <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
         {title} ({categories.length})
       </p>
@@ -386,7 +388,7 @@ const CategoryGroup = ({
           No {title.toLowerCase()} categories yet.
         </p>
       ) : (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+        <ul className="hs-divider hs-tile overflow-hidden">
           {categories.map((category) => {
             const isEditing = editingId === category.id;
             return (
@@ -406,7 +408,7 @@ const CategoryGroup = ({
                   type="button"
                   onClick={() => onStartEdit(category)}
                   aria-label={`Edit ${category.name}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="hs-btn-icon"
                 >
                   <Pencil className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -414,7 +416,7 @@ const CategoryGroup = ({
                   type="button"
                   onClick={() => onRequestDelete(category)}
                   aria-label={`Delete ${category.name}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-950/40"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>

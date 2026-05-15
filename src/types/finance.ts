@@ -36,6 +36,10 @@ export interface Transaction {
   category: string;
   description?: string;
   occurredOn: string;
+  isOperationalFund: boolean;
+  operationalFundId?: string;
+  operationalPeriodStart?: string;
+  operationalPeriodEnd?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +50,10 @@ export interface TransactionDraft {
   category: string;
   description: string;
   occurredOn: string;
+  isOperationalFund: boolean;
+  operationalFundId: string;
+  operationalPeriodStart: string;
+  operationalPeriodEnd: string;
 }
 
 export const EMPTY_TRANSACTION_DRAFT: TransactionDraft = {
@@ -54,6 +62,10 @@ export const EMPTY_TRANSACTION_DRAFT: TransactionDraft = {
   category: "",
   description: "",
   occurredOn: new Date().toISOString().slice(0, 10),
+  isOperationalFund: false,
+  operationalFundId: "",
+  operationalPeriodStart: "",
+  operationalPeriodEnd: "",
 };
 
 export const DEFAULT_FINANCE_CATEGORY_SEEDS: FinanceCategorySeed[] = [

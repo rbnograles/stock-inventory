@@ -21,18 +21,18 @@ export const EmptyInventoryState = ({
       <Inbox className="h-7 w-7" aria-hidden="true" />
     </span>
     <div className="space-y-1">
-      <p className="text-base font-extrabold text-slate-900 dark:text-white">
+      <p className="text-base font-extrabold hs-text-primary">
         {attentionOnly ? "Nothing needs attention" : "No products found"}
       </p>
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-        {attentionOnly ? "You're all caught up - nice work." : "Try a different search, or tap Add item below."}
+      <p className="text-sm font-medium hs-text-muted">
+        {attentionOnly ? "You're all caught up — nice work." : "Try a different search, or tap Add item below."}
       </p>
     </div>
     {hasFilters ? (
       <button
         type="button"
         onClick={onReset}
-        className="rounded-full bg-slate-900 px-5 py-2 text-sm font-bold text-white shadow-card dark:bg-white dark:text-slate-900"
+        className="hs-btn h-10 bg-slate-900 px-5 text-white shadow-card hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
       >
         Reset filters
       </button>
